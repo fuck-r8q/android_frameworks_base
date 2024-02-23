@@ -15,6 +15,16 @@ flag {
 }
 
 flag {
+   name: "udfps_view_performance"
+   namespace: "systemui"
+   description: "Decrease screen off blocking calls by waiting until the device is finished going to sleep before adding the udfps view."
+   bug: "225183106"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
     name: "notification_async_group_header_inflation"
     namespace: "systemui"
     description: "Inflates the notification group summary header views from the background thread."
@@ -26,6 +36,13 @@ flag {
     namespace: "systemui"
     description: "Inflates hybrid (single-line) notification views from the background thread."
     bug: "217799515"
+}
+
+flag {
+    name: "notification_color_update_logger"
+    namespace: "systemui"
+    description: "Enabled debug logging and dumping of notification color updates."
+    bug: "294347738"
 }
 
 flag {
@@ -64,6 +81,16 @@ flag {
     description: "Replaces NotifLiveDataStore with ActiveNotificationListRepository, and updates consumers. "
         "Should not bring any behavior changes."
     bug: "308623704"
+}
+
+flag {
+    name: "notifications_background_media_icons"
+    namespace: "systemui"
+    description: "Updates icons for media notifications in the background."
+    bug: "315143160"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -295,12 +322,15 @@ flag {
 }
 
 flag {
-   name: "centralized_status_bar_dimens_refactor"
+   name: "centralized_status_bar_height_fix"
    namespace: "systemui"
    description: "Refactors shade header and keyguard status bar to read status bar dimens from a"
         " central place, instead of reading resources directly. This is to take into account display"
         " cutouts and other special cases. "
-   bug: "317199366"
+   bug: "317016114"
+   metadata {
+        purpose: PURPOSE_BUGFIX
+   }
 }
 
 flag {
@@ -431,6 +461,16 @@ flag {
 }
 
 flag {
+    name: "slice_manager_binder_call_background"
+    namespace: "systemui"
+    description: "Move the ISliceManager#getPinnedSpecs binder call to the background thread."
+    bug: "322745650"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
    name: "register_new_wallet_card_in_background"
    namespace: "systemui"
    description: "Decide whether the call to registerNewWalletCards method should be issued on background thread."
@@ -450,3 +490,42 @@ flag {
     }
 }
 
+flag {
+    name: "register_zen_mode_content_observer_background"
+    namespace: "systemui"
+    description: "Decide whether to register zen mode content observers in the background thread."
+    bug: "324515627"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "clipboard_noninteractive_on_lockscreen"
+    namespace: "systemui"
+    description: "Prevents the interactive clipboard UI from appearing when device is locked"
+    bug: "317048495"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "trim_resources_with_background_trim_at_lock"
+    namespace: "systemui"
+    description: "Trim fonts and other caches when the device locks to lower memory consumption."
+    bug: "322143614"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "dedicated_notif_inflation_thread"
+    namespace: "systemui"
+    description: "Create a separate background thread for inflating notifications"
+    bug: "308967184"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}

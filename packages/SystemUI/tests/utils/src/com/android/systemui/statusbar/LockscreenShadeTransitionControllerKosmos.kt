@@ -24,11 +24,11 @@ import com.android.systemui.keyguard.domain.interactor.naturalScrollingSettingOb
 import com.android.systemui.keyguard.wakefulnessLifecycle
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
-import com.android.systemui.media.controls.ui.mediaHierarchyManager
+import com.android.systemui.media.controls.ui.controller.mediaHierarchyManager
 import com.android.systemui.plugins.activityStarter
-import com.android.systemui.power.domain.interactor.powerInteractor
 import com.android.systemui.shade.data.repository.shadeRepository
 import com.android.systemui.shade.domain.interactor.shadeInteractor
+import com.android.systemui.shade.domain.interactor.shadeLockscreenInteractor
 import com.android.systemui.statusbar.notification.stack.ambientState
 import com.android.systemui.statusbar.phone.keyguardBypassController
 import com.android.systemui.statusbar.phone.lsShadeTransitionLogger
@@ -58,8 +58,8 @@ val Kosmos.lockscreenShadeTransitionController by Fixture {
         qsTransitionControllerFactory = lockscreenShadeQsTransitionControllerFactory,
         shadeRepository = shadeRepository,
         shadeInteractor = shadeInteractor,
-        powerInteractor = powerInteractor,
         splitShadeStateController = splitShadeStateController,
+        shadeLockscreenInteractorLazy = { shadeLockscreenInteractor },
         naturalScrollingSettingObserver = naturalScrollingSettingObserver,
     )
 }

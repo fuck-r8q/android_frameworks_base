@@ -1623,7 +1623,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                             mAtmService.getLifecycleManager().scheduleTransactionItem(
                                     appThread, activityResultItem);
                         } else {
-                            transaction.addCallback(activityResultItem);
+                            transaction.addTransactionItem(activityResultItem);
                         }
                     }
                 }
@@ -1635,7 +1635,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                         mAtmService.getLifecycleManager().scheduleTransactionItem(
                                 appThread, newIntentItem);
                     } else {
-                        transaction.addCallback(newIntentItem);
+                        transaction.addTransactionItem(newIntentItem);
                     }
                 }
 
@@ -1657,7 +1657,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                     mAtmService.getLifecycleManager().scheduleTransactionItem(
                             appThread, resumeActivityItem);
                 } else {
-                    transaction.setLifecycleStateRequest(resumeActivityItem);
+                    transaction.addTransactionItem(resumeActivityItem);
                     mAtmService.getLifecycleManager().scheduleTransaction(transaction);
                 }
 

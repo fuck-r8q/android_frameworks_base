@@ -721,9 +721,14 @@ class ActivityStarter {
         try {
             onExecutionStarted();
 
-            // Refuse possible leaked file descriptors
-            if (mRequest.intent != null && mRequest.intent.hasFileDescriptors()) {
-                throw new IllegalArgumentException("File descriptors passed in Intent");
+            if (mRequest.intent != null) {
+                // Refuse possible leaked file descriptors
+                if (mRequest.intent.hasFileDescriptors()) {
+                    throw new IllegalArgumentException("File descriptors passed in Intent");
+                }
+
+                // Remove existing mismatch flag so it can be properly updated later
+                mRequest.intent.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
             }
 
             final LaunchingState launchingState;
@@ -1111,7 +1116,7 @@ class ActivityStarter {
         if (err != START_SUCCESS) {
             if (resultRecord != null) {
                 resultRecord.sendResult(INVALID_UID, resultWho, requestCode, RESULT_CANCELED,
-                        null /* data */, null /* dataGrants */);
+                        null /* data */, null /* callerToken */, null /* dataGrants */);
             }
             SafeActivityOptions.abort(options);
             return err;
@@ -1136,7 +1141,8 @@ class ActivityStarter {
                         .filterAppAccess(targetPackageName, callingUid, userId)) {
                     if (resultRecord != null) {
                         resultRecord.sendResult(INVALID_UID, resultWho, requestCode,
-                                RESULT_CANCELED, null /* data */, null /* dataGrants */);
+                                RESULT_CANCELED, null /* data */, null /* callerToken */,
+                                null /* dataGrants */);
                     }
                     SafeActivityOptions.abort(options);
                     return ActivityManager.START_CLASS_NOT_FOUND;
@@ -1224,7 +1230,7 @@ class ActivityStarter {
         if (abort) {
             if (resultRecord != null) {
                 resultRecord.sendResult(INVALID_UID, resultWho, requestCode, RESULT_CANCELED,
-                        null /* data */, null /* dataGrants */);
+                        null /* data */, null /* callerToken */, null /* dataGrants */);
             }
             // We pretend to the caller that it was really started, but they will just get a
             // cancel result.
@@ -1388,7 +1394,7 @@ class ActivityStarter {
         int requestCode = r.requestCode;
         if (resultRecord != null) {
             resultRecord.sendResult(INVALID_UID, resultWho, requestCode, RESULT_CANCELED,
-                    null /* data */, null /* dataGrants */);
+                    null /* data */, null /* callerToken */, null /* dataGrants */);
         }
         // We pretend to the caller that it was really started to make it backward compatible, but
         // they will just get a cancel result.
@@ -1751,7 +1757,7 @@ class ActivityStarter {
         if (startResult != START_SUCCESS) {
             if (r.resultTo != null) {
                 r.resultTo.sendResult(INVALID_UID, r.resultWho, r.requestCode, RESULT_CANCELED,
-                        null /* data */, null /* dataGrants */);
+                        null /* data */, null /* callerToken */, null /* dataGrants */);
             }
             return startResult;
         }
@@ -2259,7 +2265,7 @@ class ActivityStarter {
         if (mStartActivity.resultTo != null) {
             mStartActivity.resultTo.sendResult(INVALID_UID, mStartActivity.resultWho,
                     mStartActivity.requestCode, RESULT_CANCELED,
-                    null /* data */, null /* dataGrants */);
+                    null /* data */, null /* callerToken */, null /* dataGrants */);
             mStartActivity.resultTo = null;
         }
 
@@ -2655,7 +2661,7 @@ class ActivityStarter {
             Slog.w(TAG, "Activity is launching as a new task, so cancelling activity result.");
             mStartActivity.resultTo.sendResult(INVALID_UID, mStartActivity.resultWho,
                     mStartActivity.requestCode, RESULT_CANCELED,
-                    null /* data */, null /* dataGrants */);
+                    null /* data */, null /* callerToken */, null /* dataGrants */);
             mStartActivity.resultTo = null;
         }
     }
@@ -2960,7 +2966,9 @@ class ActivityStarter {
 
         activity.logStartActivity(EventLogTags.WM_NEW_INTENT, activity.getTask());
         activity.deliverNewIntentLocked(mCallingUid, mStartActivity.intent, intentGrants,
-                mStartActivity.launchedFromPackage);
+                mStartActivity.launchedFromPackage, mStartActivity.mShareIdentity,
+                mStartActivity.mUserId,
+                UserHandle.getAppId(mStartActivity.info.applicationInfo.uid));
         mIntentDelivered = true;
     }
 

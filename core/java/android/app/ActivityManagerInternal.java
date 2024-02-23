@@ -1267,5 +1267,5 @@ public abstract class ActivityManagerInternal {
      * palette readiness.
      * @hide
      */
-    public abstract boolean getThemeOverlayReadiness();
+    public abstract boolean isThemeOverlayReady(int userId);
 }

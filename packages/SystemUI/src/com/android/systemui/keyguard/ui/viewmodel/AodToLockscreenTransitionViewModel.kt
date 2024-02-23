@@ -25,10 +25,13 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.ui.KeyguardTransitionAnimationFlow
 import com.android.systemui.keyguard.ui.StateToValue
 import com.android.systemui.keyguard.ui.transitions.DeviceEntryIconTransition
+import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 
 /**
  * Breaks down AOD->LOCKSCREEN transition into discrete steps for corresponding views to consume.
@@ -39,6 +42,7 @@ class AodToLockscreenTransitionViewModel
 @Inject
 constructor(
     deviceEntryUdfpsInteractor: DeviceEntryUdfpsInteractor,
+    shadeInteractor: ShadeInteractor,
     animationFlow: KeyguardTransitionAnimationFlow,
 ) : DeviceEntryIconTransition {
 
@@ -64,25 +68,31 @@ constructor(
 
     /** Ensure alpha is set to be visible */
     fun lockscreenAlpha(viewState: ViewStateAccessor): Flow<Float> {
-        var startAlpha: Float? = null
+        var startAlpha = 1f
         return transitionAnimation.sharedFlow(
             duration = 500.milliseconds,
-            onStep = {
-                if (startAlpha == null) {
-                    startAlpha = viewState.alpha()
-                }
-                MathUtils.lerp(startAlpha!!, 1f, it)
-            },
-            onFinish = {
-                startAlpha = null
-                1f
-            },
-            onCancel = {
-                startAlpha = null
-                1f
-            },
+            onStart = { startAlpha = viewState.alpha() },
+            onStep = { MathUtils.lerp(startAlpha, 1f, it) },
         )
     }
+
+    val notificationAlpha: Flow<Float> =
+        combine(
+            shadeInteractor.shadeExpansion.map { it > 0f },
+            shadeInteractor.qsExpansion.map { it > 0f },
+            transitionAnimation.sharedFlow(
+                duration = 500.milliseconds,
+                onStep = { it },
+                onCancel = { 1f },
+            ),
+        ) { isShadeExpanded, isQsExpanded, alpha ->
+            if (isShadeExpanded || isQsExpanded) {
+                // One example of this happening is dragging a notification while pulsing on AOD
+                1f
+            } else {
+                alpha
+            }
+        }
 
     val shortcutsAlpha: Flow<Float> =
         transitionAnimation.sharedFlow(
@@ -102,7 +112,6 @@ constructor(
     override val deviceEntryParentViewAlpha: Flow<Float> =
         transitionAnimation.sharedFlow(
             duration = 500.milliseconds,
-            onStart = { 1f },
             onStep = { 1f },
         )
 }

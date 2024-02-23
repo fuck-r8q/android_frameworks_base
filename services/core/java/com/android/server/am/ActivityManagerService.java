@@ -944,7 +944,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Tracks all users with computed color resources by ThemeOverlaycvontroller
      */
     @GuardedBy("this")
-    private final Set<Integer> mThemeOverlayReadiness = new HashSet<>();
+    private final Set<Integer> mThemeOverlayReadyUsers = new HashSet<>();
 
     /**
      * Tracks association information for a particular package along with debuggability.
@@ -2373,7 +2373,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mService.startBroadcastObservers();
             } else if (phase == PHASE_THIRD_PARTY_APPS_CAN_START) {
                 mService.mPackageWatchdog.onPackagesReady();
-                mService.setHomeTimeout();
+                mService.scheduleHomeTimeout();
             }
         }
 
@@ -5415,40 +5415,43 @@ public class ActivityManagerService extends IActivityManager.Stub
     /**
      * Starts Home if there is no completion signal from ThemeOverlayController
      */
-    private void setHomeTimeout() {
+    private void scheduleHomeTimeout() {
         if (enableHomeDelay() && mHasHomeDelay.compareAndSet(false, true)) {
+            int userId = mUserController.getCurrentUserId();
             mHandler.postDelayed(() -> {
-                if (!getThemeOverlayReadiness()) {
+                if (!isThemeOverlayReady(userId)) {
                     Slog.d(TAG,
                             "ThemeHomeDelay: ThemeOverlayController not responding, launching "
                                     + "Home after "
                                     + HOME_LAUNCH_TIMEOUT_MS + "ms");
-                    setThemeOverlayReady(true);
+                    setThemeOverlayReady(userId);
                 }
             }, HOME_LAUNCH_TIMEOUT_MS);
         }
     }
 
     /**
-     * Used by ThemeOverlayController to notify all listeners for
-     * color palette readiness.
+     * Used by ThemeOverlayController to notify when color
+     * palette is ready.
+     *
+     * @param userId The ID of the user where ThemeOverlayController is ready.
+     *
+     * @throws RemoteException
+     *
      * @hide
      */
     @Override
-    public void setThemeOverlayReady(boolean readiness) {
+    public void setThemeOverlayReady(@UserIdInt int userId) {
         enforceCallingPermission(Manifest.permission.SET_THEME_OVERLAY_CONTROLLER_READY,
                 "setThemeOverlayReady");
 
-        int currentUserId = mUserController.getCurrentUserId();
-
-        boolean updateReadiness;
-        synchronized (mThemeOverlayReadiness) {
-            updateReadiness = readiness ? mThemeOverlayReadiness.add(currentUserId)
-                    : mThemeOverlayReadiness.remove(currentUserId);
+        boolean updateUser;
+        synchronized (mThemeOverlayReadyUsers) {
+            updateUser = mThemeOverlayReadyUsers.add(userId);
         }
 
-        if (updateReadiness && readiness && enableHomeDelay()) {
-            mAtmInternal.startHomeOnAllDisplays(currentUserId, "setThemeOverlayReady");
+        if (updateUser && enableHomeDelay()) {
+            mAtmInternal.startHomeOnAllDisplays(userId, "setThemeOverlayReady");
         }
     }
 
@@ -5458,10 +5461,9 @@ public class ActivityManagerService extends IActivityManager.Stub
      *
      * @hide
      */
-    public boolean getThemeOverlayReadiness() {
-        int uid = mUserController.getCurrentUserId();
-        synchronized (mThemeOverlayReadiness) {
-            return mThemeOverlayReadiness.contains(uid);
+    public boolean isThemeOverlayReady(int userId) {
+        synchronized (mThemeOverlayReadyUsers) {
+            return mThemeOverlayReadyUsers.contains(userId);
         }
     }
 
@@ -5564,6 +5566,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         }
                     }
                     intents[i] = new Intent(intent);
+                    intents[i].removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
                 }
             }
             if (resolvedTypes != null && resolvedTypes.length != intents.length) {
@@ -13774,9 +13777,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             throws TransactionTooLargeException {
         enforceNotIsolatedCaller("startService");
         enforceAllowedToStartOrBindServiceIfSdkSandbox(service);
-        // Refuse possible leaked file descriptors
-        if (service != null && service.hasFileDescriptors() == true) {
-            throw new IllegalArgumentException("File descriptors passed in Intent");
+        if (service != null) {
+            // Refuse possible leaked file descriptors
+            if (service.hasFileDescriptors()) {
+                throw new IllegalArgumentException("File descriptors passed in Intent");
+            }
+            // Remove existing mismatch flag so it can be properly updated later
+            service.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
         }
 
         if (callingPackage == null) {
@@ -14005,9 +14012,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         enforceNotIsolatedCaller("bindService");
         enforceAllowedToStartOrBindServiceIfSdkSandbox(service);
 
-        // Refuse possible leaked file descriptors
-        if (service != null && service.hasFileDescriptors() == true) {
-            throw new IllegalArgumentException("File descriptors passed in Intent");
+        if (service != null) {
+            // Refuse possible leaked file descriptors
+            if (service.hasFileDescriptors()) {
+                throw new IllegalArgumentException("File descriptors passed in Intent");
+            }
+            // Remove existing mismatch flag so it can be properly updated later
+            service.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
         }
 
         if (callingPackage == null) {
@@ -15908,9 +15919,13 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     final Intent verifyBroadcastLocked(Intent intent) {
-        // Refuse possible leaked file descriptors
-        if (intent != null && intent.hasFileDescriptors() == true) {
-            throw new IllegalArgumentException("File descriptors passed in Intent");
+        if (intent != null) {
+            // Refuse possible leaked file descriptors
+            if (intent.hasFileDescriptors()) {
+                throw new IllegalArgumentException("File descriptors passed in Intent");
+            }
+            // Remove existing mismatch flag so it can be properly updated later
+            intent.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
         }
 
         int flags = intent.getFlags();
@@ -18224,8 +18239,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             // Clean up various services by removing the user
             mBatteryStatsService.onUserRemoved(userId);
 
-            synchronized (mThemeOverlayReadiness) {
-                mThemeOverlayReadiness.remove(userId);
+            synchronized (mThemeOverlayReadyUsers) {
+                mThemeOverlayReadyUsers.remove(userId);
             }
         }
 
@@ -19592,8 +19607,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public boolean getThemeOverlayReadiness() {
-            return ActivityManagerService.this.getThemeOverlayReadiness();
+        public boolean isThemeOverlayReady(int userId) {
+            return ActivityManagerService.this.isThemeOverlayReady(userId);
         }
     }
 

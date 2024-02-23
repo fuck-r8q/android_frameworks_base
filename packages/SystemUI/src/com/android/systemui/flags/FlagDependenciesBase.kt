@@ -19,6 +19,7 @@ package com.android.systemui.flags
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.NotificationManager.IMPORTANCE_DEFAULT
 import android.content.Context
 import android.util.Log
 import com.android.systemui.CoreStartable
@@ -48,10 +49,14 @@ abstract class FlagDependenciesBase(
     private var unmetDependencies = emptyList<Dependency>()
 
     override fun start() {
+        if (!handler.enableDependencies) {
+            return
+        }
         defineDependencies()
         allDependencies = workingDependencies.toList()
         unmetDependencies = workingDependencies.filter { !it.isMet }
         workingDependencies.clear()
+        handler.onCollected(allDependencies)
         if (unmetDependencies.isNotEmpty()) {
             handler.warnAboutBadFlagConfiguration(all = allDependencies, unmet = unmetDependencies)
         }
@@ -106,14 +111,24 @@ abstract class FlagDependenciesBase(
 
     /** Add a dependency to the working list */
     private fun addDependency(first: FlagToken, second: FlagToken) {
-        if (!Compile.IS_DEBUG) return // `user` builds should omit all this code
+        if (!handler.enableDependencies) return
         workingDependencies.add(
             Dependency(first.name, first.isEnabled, second.name, second.isEnabled)
         )
     }
 
-    /** An interface which handles a warning about a bad flag configuration. */
+    /** An interface which handles dependency collection. */
     interface Handler {
+        /**
+         * Should FlagDependencies do anything?
+         *
+         * @return false for user builds so that we skip this overhead.
+         */
+        val enableDependencies: Boolean
+            get() = Compile.IS_DEBUG
+        /** Handle the complete list of dependencies. */
+        fun onCollected(all: List<Dependency>) {}
+        /** Handle a bad flag configuration. */
         fun warnAboutBadFlagConfiguration(all: List<Dependency>, unmet: List<Dependency>)
     }
 }
@@ -133,10 +148,10 @@ constructor(
         all: List<FlagDependenciesBase.Dependency>,
         unmet: List<FlagDependenciesBase.Dependency>
     ) {
-        val title = "Invalid flag dependencies: ${unmet.size} of ${all.size}"
+        val title = "Invalid flag dependencies: ${unmet.size}"
         val details = unmet.joinToString("\n") { it.shortUnmetString() }
         Log.e("FlagDependencies", "$title:\n$details")
-        val channel = NotificationChannel("FLAGS", "Flags", NotificationManager.IMPORTANCE_DEFAULT)
+        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, IMPORTANCE_DEFAULT)
         val notification =
             Notification.Builder(context, channel.id)
                 .setSmallIcon(com.android.internal.R.drawable.stat_sys_adb)
@@ -146,7 +161,18 @@ constructor(
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .build()
         notifManager.createNotificationChannel(channel)
-        notifManager.notify("flags", 0, notification)
+        notifManager.notify(NOTIF_TAG, NOTIF_ID, notification)
+    }
+
+    override fun onCollected(all: List<FlagDependenciesBase.Dependency>) {
+        notifManager.cancel(NOTIF_TAG, NOTIF_ID)
+    }
+
+    companion object {
+        private const val CHANNEL_ID = "FLAGS"
+        private const val CHANNEL_NAME = "Flags"
+        private const val NOTIF_TAG = "FlagDependenciesNotifier"
+        private const val NOTIF_ID = 0
     }
 }
 

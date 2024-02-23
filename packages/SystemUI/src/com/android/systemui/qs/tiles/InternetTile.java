@@ -58,7 +58,7 @@ import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.QsEventLogger;
 import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
-import com.android.systemui.qs.tiles.dialog.InternetDialogFactory;
+import com.android.systemui.qs.tiles.dialog.InternetDialogManager;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.connectivity.IconState;
 import com.android.systemui.statusbar.connectivity.MobileDataIndicators;
@@ -90,7 +90,7 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
     private int mLastTileState = LAST_STATE_UNKNOWN;
 
     protected final InternetSignalCallback mSignalCallback = new InternetSignalCallback();
-    private final InternetDialogFactory mInternetDialogFactory;
+    private final InternetDialogManager mInternetDialogManager;
     final Handler mHandler;
     private CarrierNameCustomization mCarrierNameCustomization;
 
@@ -107,12 +107,12 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
             QSLogger qsLogger,
             NetworkController networkController,
             AccessPointController accessPointController,
-            InternetDialogFactory internetDialogFactory,
+            InternetDialogManager internetDialogManager,
             CarrierNameCustomization carrierNameCustomization
     ) {
         super(host, uiEventLogger, backgroundLooper, mainHandler, falsingManager, metricsLogger,
                 statusBarStateController, activityStarter, qsLogger);
-        mInternetDialogFactory = internetDialogFactory;
+        mInternetDialogManager = internetDialogManager;
         mHandler = mainHandler;
         mController = networkController;
         mAccessPointController = accessPointController;
@@ -135,7 +135,7 @@ public class InternetTile extends QSTileImpl<QSTile.BooleanState> {
 
     @Override
     protected void handleClick(@Nullable View view) {
-        mHandler.post(() -> mInternetDialogFactory.create(true,
+        mHandler.post(() -> mInternetDialogManager.create(true,
                 mAccessPointController.canConfigMobileData(),
                 mAccessPointController.canConfigWifi(), view));
     }

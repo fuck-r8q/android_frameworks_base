@@ -21,12 +21,17 @@ import com.android.settingslib.volume.data.repository.LocalMediaRepositoryImpl
 import com.android.settingslib.volume.shared.AudioManagerIntentsReceiver
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.media.controls.pipeline.LocalMediaManagerFactory
+import com.android.systemui.media.controls.util.LocalMediaManagerFactory
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 
-class LocalMediaRepositoryFactory
+interface LocalMediaRepositoryFactory {
+
+    fun create(packageName: String?): LocalMediaRepository
+}
+
+class LocalMediaRepositoryFactoryImpl
 @Inject
 constructor(
     private val intentsReceiver: AudioManagerIntentsReceiver,
@@ -34,9 +39,9 @@ constructor(
     private val localMediaManagerFactory: LocalMediaManagerFactory,
     @Application private val coroutineScope: CoroutineScope,
     @Background private val backgroundCoroutineContext: CoroutineContext,
-) {
+) : LocalMediaRepositoryFactory {
 
-    fun create(packageName: String?): LocalMediaRepository =
+    override fun create(packageName: String?): LocalMediaRepository =
         LocalMediaRepositoryImpl(
             intentsReceiver,
             localMediaManagerFactory.create(packageName),

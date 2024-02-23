@@ -1350,7 +1350,7 @@ public class WindowManagerService extends IWindowManager.Stub
         LocalServices.addService(WindowManagerInternal.class, new LocalService());
         LocalServices.addService(
                 ImeTargetVisibilityPolicy.class, new ImeTargetVisibilityPolicyImpl());
-        mEmbeddedWindowController = new EmbeddedWindowController(mAtmService);
+        mEmbeddedWindowController = new EmbeddedWindowController(mAtmService, inputManager);
 
         mDisplayAreaPolicyProvider = DisplayAreaPolicy.Provider.fromResources(
                 mContext.getResources());
@@ -6792,11 +6792,6 @@ public class WindowManagerService extends IWindowManager.Stub
     private void dumpWindowsLocked(PrintWriter pw, boolean dumpAll,
             ArrayList<WindowState> windows) {
         pw.println("WINDOW MANAGER WINDOWS (dumpsys window windows)");
-        dumpWindowsNoHeaderLocked(pw, dumpAll, windows);
-    }
-
-    private void dumpWindowsNoHeaderLocked(PrintWriter pw, boolean dumpAll,
-            ArrayList<WindowState> windows) {
         mRoot.dumpWindowsNoHeader(pw, dumpAll, windows);
 
         if (!mHidingNonSystemOverlayWindows.isEmpty()) {
@@ -7031,9 +7026,15 @@ public class WindowManagerService extends IWindowManager.Stub
         if (reason != null) {
             pw.println("  Reason: " + reason);
         }
+        pw.println();
+        final ArrayList<WindowState> relatedWindows = new ArrayList<>();
         for (int i = mRoot.getChildCount() - 1; i >= 0; i--) {
             final DisplayContent dc = mRoot.getChildAt(i);
             final int displayId = dc.getDisplayId();
+            final WindowState currentFocus = dc.mCurrentFocus;
+            final ActivityRecord focusedApp = dc.mFocusedApp;
+            pw.println("  Display #" + displayId + " currentFocus=" + currentFocus
+                    + " focusedApp=" + focusedApp);
             if (!dc.mWinAddedSinceNullFocus.isEmpty()) {
                 pw.println("  Windows added in display #" + displayId + " since null focus: "
                         + dc.mWinAddedSinceNullFocus);
@@ -7042,12 +7043,25 @@ public class WindowManagerService extends IWindowManager.Stub
                 pw.println("  Windows removed in display #" + displayId + " since null focus: "
                         + dc.mWinRemovedSinceNullFocus);
             }
+            pw.println("  Tasks in top down Z order:");
+            dc.forAllTaskDisplayAreas(tda -> {
+                tda.dump(pw, "    ", false /* dumpAll */);
+            });
+            dc.getInputMonitor().dump(pw, "  ");
+            pw.println();
+            dc.forAllWindows(w -> {
+                if ((currentFocus != null && Objects.equals(w.mAttrs.packageName,
+                        currentFocus.mAttrs.packageName)) || (focusedApp != null
+                        && Objects.equals(w.mAttrs.packageName, focusedApp.packageName))) {
+                    relatedWindows.add(w);
+                }
+            }, true /* traverseTopToBottom */);
         }
+        if (windowState != null && !relatedWindows.contains(windowState)) {
+            relatedWindows.add(windowState);
+        }
+        mRoot.dumpWindowsNoHeader(pw, true /* dumpAll */, relatedWindows);
         pw.println();
-        dumpWindowsNoHeaderLocked(pw, true, null);
-        pw.println();
-        pw.println("Last ANR continued");
-        mRoot.dumpDisplayContents(pw);
         pw.close();
         mLastANRState = sw.toString();
 
@@ -7886,10 +7900,11 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public void setForceShowMagnifiableBounds(int displayId, boolean show) {
+        public void setFullscreenMagnificationActivated(int displayId, boolean activated) {
             synchronized (mGlobalLock) {
                 if (mAccessibilityController.hasCallbacks()) {
-                    mAccessibilityController.setForceShowMagnifiableBounds(displayId, show);
+                    mAccessibilityController
+                            .setFullscreenMagnificationActivated(displayId, activated);
                 } else {
                     throw new IllegalStateException("Magnification callbacks not set!");
                 }
@@ -8674,6 +8689,17 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public void removeBlockScreenCaptureForApps(ArraySet<PackageInfo> packageInfos) {
+            synchronized (mGlobalLock) {
+                boolean modified =
+                        mSensitiveContentPackages.removeBlockScreenCaptureForApps(packageInfos);
+                if (modified) {
+                    WindowManagerService.this.refreshScreenCaptureDisabled();
+                }
+            }
+        }
+
+        @Override
         public void clearBlockedApps() {
             synchronized (mGlobalLock) {
                 boolean modified = mSensitiveContentPackages.clearBlockedApps();
@@ -9086,73 +9112,33 @@ public class WindowManagerService extends IWindowManager.Stub
                 null /* region */, clientToken);
     }
 
-    boolean transferEmbeddedTouchFocusToHost(IWindow embeddedWindow) {
-        final IBinder windowBinder = embeddedWindow.asBinder();
-        final IBinder hostInputChannel, embeddedInputChannel;
-        synchronized (mGlobalLock) {
-            final EmbeddedWindowController.EmbeddedWindow ew =
-                mEmbeddedWindowController.getByWindowToken(windowBinder);
-            if (ew == null) {
-                Slog.w(TAG, "Attempt to transfer touch focus from non-existent embedded window");
-                return false;
-            }
-            final WindowState hostWindowState = ew.getWindowState();
-            if (hostWindowState == null) {
-                Slog.w(TAG, "Attempt to transfer touch focus from embedded window with no" +
-                    " associated host");
-                return false;
-            }
-            embeddedInputChannel = ew.getInputChannelToken();
-            if (embeddedInputChannel == null) {
-                Slog.w(TAG, "Attempt to transfer touch focus from embedded window with no input" +
-                    " channel");
-                return false;
-            }
-            hostInputChannel = hostWindowState.mInputChannelToken;
-            if (hostInputChannel == null) {
-                Slog.w(TAG, "Attempt to transfer touch focus to a host window with no" +
-                    " input channel");
-                return false;
-            }
-            return mInputManager.transferTouchFocus(embeddedInputChannel, hostInputChannel);
-        }
-    }
+    @Override
+    public boolean transferTouchGesture(@NonNull InputTransferToken transferFromToken,
+            @NonNull InputTransferToken transferToToken) {
+        Objects.requireNonNull(transferFromToken);
+        Objects.requireNonNull(transferToToken);
 
-    boolean transferHostTouchGestureToEmbedded(Session session, IWindow hostWindow,
-            InputTransferToken inputTransferToken) {
-        final IBinder hostInputChannel, embeddedInputChannel;
-        synchronized (mGlobalLock) {
-            final WindowState hostWindowState = windowForClientLocked(session, hostWindow, false);
-            if (hostWindowState == null) {
-                Slog.w(TAG, "Attempt to transfer touch gesture with invalid host window");
-                return false;
+        final long identity = Binder.clearCallingIdentity();
+        boolean didTransfer;
+        try {
+            synchronized (mGlobalLock) {
+                // If the transferToToken exists in the input to window map, it means the request
+                // is to transfer from embedded to host. Otherwise, the transferToToken
+                // represents an embedded window so transfer from host to embedded.
+                WindowState windowStateTo = mInputToWindowMap.get(transferToToken.mToken);
+                if (windowStateTo != null) {
+                    didTransfer = mEmbeddedWindowController.transferToHost(transferFromToken,
+                            windowStateTo);
+                } else {
+                    WindowState windowStateFrom = mInputToWindowMap.get(transferFromToken.mToken);
+                    didTransfer = mEmbeddedWindowController.transferToEmbedded(windowStateFrom,
+                            transferToToken);
+                }
             }
-
-            final EmbeddedWindowController.EmbeddedWindow ew =
-                    mEmbeddedWindowController.getByInputTransferToken(inputTransferToken);
-            if (ew == null || ew.mHostWindowState == null) {
-                Slog.w(TAG, "Attempt to transfer touch gesture to non-existent embedded window");
-                return false;
-            }
-            if (ew.mHostWindowState.mClient.asBinder() != hostWindow.asBinder()) {
-                Slog.w(TAG, "Attempt to transfer touch gesture to embedded window not associated"
-                        + " with host window");
-                return false;
-            }
-            embeddedInputChannel = ew.getInputChannelToken();
-            if (embeddedInputChannel == null) {
-                Slog.w(TAG, "Attempt to transfer touch focus from embedded window with no input"
-                        + " channel");
-                return false;
-            }
-            hostInputChannel = hostWindowState.mInputChannelToken;
-            if (hostInputChannel == null) {
-                Slog.w(TAG,
-                        "Attempt to transfer touch focus to a host window with no input channel");
-                return false;
-            }
-            return mInputManager.transferTouchFocus(hostInputChannel, embeddedInputChannel);
+        } finally {
+            Binder.restoreCallingIdentity(identity);
         }
+        return didTransfer;
     }
 
     private void updateInputChannel(IBinder channelToken, int callingUid, int callingPid,

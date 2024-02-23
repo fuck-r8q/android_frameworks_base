@@ -23,7 +23,6 @@
 package com.android.systemui.qs.tiles;
 
 import static com.google.common.truth.Truth.assertThat;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -44,7 +43,7 @@ import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.QsEventLogger;
 import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
-import com.android.systemui.qs.tiles.dialog.InternetDialogFactory;
+import com.android.systemui.qs.tiles.dialog.InternetDialogManager;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.connectivity.IconState;
 import com.android.systemui.statusbar.connectivity.NetworkController;
@@ -70,7 +69,7 @@ public class InternetTileTest extends SysuiTestCase {
     @Mock
     private AccessPointController mAccessPointController;
     @Mock
-    private InternetDialogFactory mInternetDialogFactory;
+    private InternetDialogManager mInternetDialogManager;
     @Mock
     private QsEventLogger mUiEventLogger;
     @Mock
@@ -98,7 +97,7 @@ public class InternetTileTest extends SysuiTestCase {
             mock(QSLogger.class),
             mNetworkController,
             mAccessPointController,
-            mInternetDialogFactory,
+            mInternetDialogManager,
             mCarrierNameCustomization
         );
 

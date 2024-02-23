@@ -109,6 +109,7 @@ import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.ILockSettings;
 import com.android.internal.widget.LockSettingsInternal;
+import com.android.server.adaptiveauth.AdaptiveAuthService;
 import com.android.server.am.ActivityManagerService;
 import com.android.server.appbinding.AppBindingService;
 import com.android.server.appop.AppOpMigrationHelper;
@@ -1491,7 +1492,6 @@ public final class SystemServer implements Dumpable {
         VcnManagementService vcnManagement = null;
         NetworkPolicyManagerService networkPolicy = null;
         WindowManagerService wm = null;
-        SerialService serial = null;
         NetworkTimeUpdateService networkTimeUpdater = null;
         InputManagerService inputManager = null;
         TelephonyRegistry telephonyRegistry = null;
@@ -2401,13 +2401,7 @@ public final class SystemServer implements Dumpable {
 
             if (!isWatch) {
                 t.traceBegin("StartSerialService");
-                try {
-                    // Serial port support
-                    serial = new SerialService(context);
-                    ServiceManager.addService(Context.SERIAL_SERVICE, serial);
-                } catch (Throwable e) {
-                    Slog.e(TAG, "Failure starting SerialService", e);
-                }
+                mSystemServiceManager.startService(SerialService.Lifecycle.class);
                 t.traceEnd();
             }
 
@@ -2654,6 +2648,12 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartAuthService");
             mSystemServiceManager.startService(AuthService.class);
             t.traceEnd();
+
+            if (android.adaptiveauth.Flags.enableAdaptiveAuth()) {
+                t.traceBegin("StartAdaptiveAuthService");
+                mSystemServiceManager.startService(AdaptiveAuthService.class);
+                t.traceEnd();
+            }
 
             if (!isWatch) {
                 // We don't run this on watches as there are no plans to use the data logged
@@ -3079,7 +3079,7 @@ public final class SystemServer implements Dumpable {
             t.traceEnd();
         }
 
-        if (com.android.server.notification.Flags.sensitiveNotificationAppProtection()
+        if (android.permission.flags.Flags.sensitiveNotificationAppProtection()
                 || android.view.flags.Flags.sensitiveContentAppProtection()) {
             t.traceBegin("StartSensitiveContentProtectionManager");
             mSystemServiceManager.startService(SensitiveContentProtectionManagerService.class);

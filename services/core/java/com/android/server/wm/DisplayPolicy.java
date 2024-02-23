@@ -109,7 +109,6 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.util.BoostFramework;
 import android.util.ArraySet;
-import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.DisplayInfo;
@@ -2221,8 +2220,7 @@ public class DisplayPolicy {
             }
             return false;
         }
-        if (mCachedDecorInsets != null && !mCachedDecorInsets.canPreserve()
-                && !mDisplayContent.isSleeping()) {
+        if (mCachedDecorInsets != null && !mCachedDecorInsets.canPreserve() && mScreenOnFully) {
             mCachedDecorInsets = null;
         }
         mDecorInsets.invalidate();
@@ -2287,16 +2285,6 @@ public class DisplayPolicy {
         }
         mCachedDecorInsets.mPreserveId =
                 mDisplayContent.mTransitionController.getCollectingTransitionId();
-        // The validator will run after the transition is finished. So if the insets are changed
-        // during the transition, it can update to the latest state.
-        mDisplayContent.mTransitionController.mStateValidators.add(() -> {
-            // The insets provider client may defer to change its window until screen is on. So
-            // only validate when awake to avoid the cache being always dropped.
-            if (!mDisplayContent.isSleeping() && updateDecorInsetsInfo()) {
-                Slog.d(TAG, "Insets changed after display switch transition");
-                mDisplayContent.sendNewConfiguration();
-            }
-        });
     }
 
     @NavigationBarPosition
@@ -3042,9 +3030,6 @@ public class DisplayPolicy {
         if (!CLIENT_TRANSIENT) {
             mSystemGestures.dump(pw, prefix);
         }
-
-        pw.print(prefix); pw.println("Looper state:");
-        mHandler.getLooper().dump(new PrintWriterPrinter(pw), prefix + "  ");
     }
 
     private boolean supportsPointerLocation() {

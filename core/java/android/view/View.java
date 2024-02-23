@@ -78,6 +78,7 @@ import android.content.ClipDescription;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.res.ColorStateList;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
@@ -5358,16 +5359,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     /**
      * Flag indicating that an unhandled drag should be delegated to the system to be started if no
      * visible window wishes to handle the drop. When using this flag, the caller must provide
-     * ClipData with an Item that contains an immutable PendingIntent to an activity to be launched
+     * ClipData with an Item that contains an immutable IntentSender to an activity to be launched
      * (not a broadcast, service, etc).  See
-     * {@link ClipData.Item.Builder#setPendingIntent(PendingIntent)}.
+     * {@link ClipData.Item.Builder#setIntentSender(IntentSender)}.
      *
      * The system can decide to launch the intent or not based on factors like the current screen
      * size or windowing mode. If the system does not launch the intent, it will be canceled via the
      * normal drag and drop flow.
      */
     @FlaggedApi(FLAG_DELEGATE_UNHANDLED_DRAGS)
-    public static final int DRAG_FLAG_START_PENDING_INTENT_ON_UNHANDLED_DRAG = 1 << 13;
+    public static final int DRAG_FLAG_START_INTENT_SENDER_ON_UNHANDLED_DRAG = 1 << 13;
 
     /**
      * Vertical scroll factor cached by {@link #getVerticalScrollFactor}.
@@ -5630,7 +5631,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     // The preferred frame rate of the view that is mainly used for
     // touch boosting, view velocity handling, and TextureView.
-    private float mPreferredFrameRate = Float.NaN;
+    private float mPreferredFrameRate = REQUESTED_FRAME_RATE_CATEGORY_DEFAULT;
 
     private int mInfrequentUpdateCount = 0;
     private long mLastUpdateTimeMillis = 0;
@@ -5639,7 +5640,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private int mLastFrameRateCategory = FRAME_RATE_CATEGORY_HIGH;
 
     @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
-    public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = 0;
+    public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = Float.NaN;
     @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
     public static final float REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE = -1;
     @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
@@ -28679,10 +28680,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             if (com.android.window.flags.Flags.delegateUnhandledDrags()) {
                 data.prepareToLeaveProcess(
                         (flags & (DRAG_FLAG_GLOBAL_SAME_APPLICATION | DRAG_FLAG_GLOBAL)) != 0);
-                if ((flags & DRAG_FLAG_START_PENDING_INTENT_ON_UNHANDLED_DRAG) != 0) {
-                    if (!data.hasActivityPendingIntents()) {
+                if ((flags & DRAG_FLAG_START_INTENT_SENDER_ON_UNHANDLED_DRAG) != 0) {
+                    if (!hasActivityPendingIntents(data)) {
                         // Reset the flag if there is no launchable activity intent
-                        flags &= ~DRAG_FLAG_START_PENDING_INTENT_ON_UNHANDLED_DRAG;
+                        flags &= ~DRAG_FLAG_START_INTENT_SENDER_ON_UNHANDLED_DRAG;
                         Log.w(VIEW_LOG_TAG, "startDragAndDrop called with "
                                 + "DRAG_FLAG_START_INTENT_ON_UNHANDLED_DRAG but the clip data "
                                 + "contains non-activity PendingIntents");
@@ -28795,7 +28796,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                     mAttachInfo.mDragSurface.release();
                 }
                 if (mAttachInfo.mDragData != null) {
-                    mAttachInfo.mDragData.cleanUpPendingIntents();
+                    View.cleanUpPendingIntents(mAttachInfo.mDragData);
                 }
                 mAttachInfo.mDragSurface = surface;
                 mAttachInfo.mDragToken = token;
@@ -28817,6 +28818,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             }
             session.kill();
             surfaceControl.release();
+        }
+    }
+
+     /**
+     * Checks if this clip data has a pending intent that is an activity type.
+     * @hide
+     */
+    static boolean hasActivityPendingIntents(ClipData data) {
+        final int size = data.getItemCount();
+        for (int i = 0; i < size; i++) {
+            final ClipData.Item item = data.getItemAt(i);
+            if (item.getIntentSender() != null) {
+                final PendingIntent pi = new PendingIntent(item.getIntentSender().getTarget());
+                if (pi.isActivity()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Cleans up all pending intents in the ClipData.
+     * @hide
+     */
+    static void cleanUpPendingIntents(ClipData data) {
+        final int size = data.getItemCount();
+        for (int i = 0; i < size; i++) {
+            final ClipData.Item item = data.getItemAt(i);
+            if (item.getIntentSender() != null) {
+                final PendingIntent pi = new PendingIntent(item.getIntentSender().getTarget());
+                pi.cancel();
+            }
         }
     }
 
@@ -33471,7 +33505,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (mInfrequentUpdateCount == INFREQUENT_UPDATE_COUNTS) {
             return FRAME_RATE_CATEGORY_NORMAL;
         }
-
         return mLastFrameRateCategory;
     }
 

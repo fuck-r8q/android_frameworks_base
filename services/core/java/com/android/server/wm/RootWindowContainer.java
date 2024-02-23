@@ -621,10 +621,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     void refreshSecureSurfaceState() {
-        forAllWindows((w) -> {
-            if (w.mHasSurface) {
-                w.setSecureLocked(w.isSecureLocked());
-            }
+        forAllWindows(w -> {
+            w.setSecureLocked(w.isSecureLocked());
         }, true /* traverseTopToBottom */);
     }
 
@@ -1463,7 +1461,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             return false;
         }
 
-        if (enableHomeDelay() && !mService.mAmInternal.getThemeOverlayReadiness()) {
+        if (enableHomeDelay() && !mService.mAmInternal.isThemeOverlayReady(userId)) {
             Slog.d(TAG, "ThemeHomeDelay: Home launch was deferred.");
             return false;
         }
@@ -2607,6 +2605,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (displayShouldSleep == display.isSleeping()) {
                 continue;
             }
+            final boolean wasSleeping = display.isSleeping();
             display.setIsSleeping(displayShouldSleep);
 
             if (display.mTransitionController.isShellTransitionsEnabled()
@@ -2632,9 +2631,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // Use NONE if keyguard is not showing.
                 int transit = TRANSIT_NONE;
                 Task startTask = null;
-                if (!display.getDisplayPolicy().isAwake()) {
-                    // Note that currently this only happens on default display because non-default
-                    // display is always awake.
+                if (wasSleeping) {
                     transit = TRANSIT_WAKE;
                 } else if (display.isKeyguardOccluded()) {
                     // The display was awake so this is resuming activity for occluding keyguard.

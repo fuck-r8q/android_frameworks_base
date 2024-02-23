@@ -63,7 +63,7 @@ import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository;
 import com.android.systemui.keyguard.shared.model.KeyguardState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
-import com.android.systemui.media.controls.ui.KeyguardMediaController;
+import com.android.systemui.media.controls.ui.controller.KeyguardMediaController;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.OnMenuEventListener;
@@ -78,6 +78,7 @@ import com.android.systemui.statusbar.NotificationLockscreenUserManager.UserChan
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.RemoteInputController;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
+import com.android.systemui.statusbar.notification.ColorUpdateLogger;
 import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.collection.NotifCollection;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
@@ -148,6 +149,7 @@ public class NotificationStackScrollLayoutControllerTest extends SysuiTestCase {
     @Mock private PrimaryBouncerInteractor mPrimaryBouncerInteractor;
     @Mock private NotificationLockscreenUserManager mNotificationLockscreenUserManager;
     @Mock private MetricsLogger mMetricsLogger;
+    @Mock private ColorUpdateLogger mColorUpdateLogger;
     @Mock private DumpManager mDumpManager;
     @Mock(answer = Answers.RETURNS_SELF)
     private NotificationSwipeHelper.Builder mNotificationSwipeHelperBuilder;
@@ -1007,6 +1009,7 @@ public class NotificationStackScrollLayoutControllerTest extends SysuiTestCase {
                 mZenModeController,
                 mNotificationLockscreenUserManager,
                 mMetricsLogger,
+                mColorUpdateLogger,
                 mDumpManager,
                 new FalsingCollectorFake(),
                 new FalsingManagerFake(),

@@ -238,7 +238,6 @@ import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.TrustedCertificateStore;
 import com.android.server.am.MemInfoDumpProto;
-import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.AppSpecializationHooks;
@@ -1235,7 +1234,8 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         @Override
-        public final void scheduleTimeoutServiceForType(IBinder token, int startId, int fgsType) {
+        public final void scheduleTimeoutServiceForType(IBinder token, int startId,
+                @ServiceInfo.ForegroundServiceType int fgsType) {
             if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                 Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                         "scheduleTimeoutServiceForType. token=" + token);
@@ -3759,15 +3759,11 @@ public final class ActivityThread extends ClientTransactionHandler
         if (DEBUG_RESULTS) Slog.v(TAG, "sendActivityResult: id=" + id
                 + " req=" + requestCode + " res=" + resultCode + " data=" + data);
         final ArrayList<ResultInfo> list = new ArrayList<>();
-        list.add(new ResultInfo(id, requestCode, resultCode, data));
+        list.add(new ResultInfo(id, requestCode, resultCode, data, activityToken));
         final ClientTransaction clientTransaction = ClientTransaction.obtain(mAppThread);
         final ActivityResultItem activityResultItem = ActivityResultItem.obtain(
                 activityToken, list);
-        if (Flags.bundleClientTransactionFlag()) {
-            clientTransaction.addTransactionItem(activityResultItem);
-        } else {
-            clientTransaction.addCallback(activityResultItem);
-        }
+        clientTransaction.addTransactionItem(activityResultItem);
         try {
             mAppThread.scheduleTransaction(clientTransaction);
         } catch (RemoteException e) {
@@ -4204,7 +4200,12 @@ public final class ActivityThread extends ClientTransactionHandler
             intent.prepareToEnterProcess(isProtectedComponent(r.activityInfo),
                     r.activity.getAttributionSource());
             r.activity.mFragments.noteStateNotSaved();
-            mInstrumentation.callActivityOnNewIntent(r.activity, intent);
+            if (android.security.Flags.contentUriPermissionApis()) {
+                ComponentCaller caller = new ComponentCaller(r.token, intent.mCallerToken);
+                mInstrumentation.callActivityOnNewIntent(r.activity, intent, caller);
+            } else {
+                mInstrumentation.callActivityOnNewIntent(r.activity, intent);
+            }
         }
     }
 
@@ -4549,11 +4550,7 @@ public final class ActivityThread extends ClientTransactionHandler
         final PauseActivityItem pauseActivityItem = PauseActivityItem.obtain(r.token,
                 r.activity.isFinishing(), /* userLeaving */ true, r.activity.mConfigChangeFlags,
                 /* dontReport */ false, /* autoEnteringPip */ false);
-        if (Flags.bundleClientTransactionFlag()) {
-            transaction.addTransactionItem(pauseActivityItem);
-        } else {
-            transaction.setLifecycleStateRequest(pauseActivityItem);
-        }
+        transaction.addTransactionItem(pauseActivityItem);
         executeTransaction(transaction);
     }
 
@@ -4561,11 +4558,7 @@ public final class ActivityThread extends ClientTransactionHandler
         final ClientTransaction transaction = ClientTransaction.obtain(mAppThread);
         final ResumeActivityItem resumeActivityItem = ResumeActivityItem.obtain(r.token,
                 /* isForward */ false, /* shouldSendCompatFakeFocus */ false);
-        if (Flags.bundleClientTransactionFlag()) {
-            transaction.addTransactionItem(resumeActivityItem);
-        } else {
-            transaction.setLifecycleStateRequest(resumeActivityItem);
-        }
+        transaction.addTransactionItem(resumeActivityItem);
         executeTransaction(transaction);
     }
 
@@ -5160,7 +5153,8 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
-    private void handleTimeoutServiceForType(IBinder token, int startId, int fgsType) {
+    private void handleTimeoutServiceForType(IBinder token, int startId,
+            @ServiceInfo.ForegroundServiceType int fgsType) {
         Service s = mServices.get(token);
         if (s != null) {
             try {
@@ -5795,8 +5789,14 @@ public final class ActivityThread extends ClientTransactionHandler
                 }
                 if (DEBUG_RESULTS) Slog.v(TAG,
                         "Delivering result to activity " + r + " : " + ri);
-                r.activity.dispatchActivityResult(ri.mResultWho,
-                        ri.mRequestCode, ri.mResultCode, ri.mData, reason);
+                if (android.security.Flags.contentUriPermissionApis()) {
+                    ComponentCaller caller = new ComponentCaller(r.token, ri.mCallerToken);
+                    r.activity.dispatchActivityResult(ri.mResultWho,
+                            ri.mRequestCode, ri.mResultCode, ri.mData, caller, reason);
+                } else {
+                    r.activity.dispatchActivityResult(ri.mResultWho,
+                            ri.mRequestCode, ri.mResultCode, ri.mData, reason);
+                }
             } catch (Exception e) {
                 if (!mInstrumentation.onException(r.activity, e)) {
                     throw new RuntimeException(
@@ -6179,13 +6179,8 @@ public final class ActivityThread extends ClientTransactionHandler
                 TransactionExecutorHelper.getLifecycleRequestForCurrentState(r);
         // Schedule the transaction.
         final ClientTransaction transaction = ClientTransaction.obtain(mAppThread);
-        if (Flags.bundleClientTransactionFlag()) {
-            transaction.addTransactionItem(activityRelaunchItem);
-            transaction.addTransactionItem(lifecycleRequest);
-        } else {
-            transaction.addCallback(activityRelaunchItem);
-            transaction.setLifecycleStateRequest(lifecycleRequest);
-        }
+        transaction.addTransactionItem(activityRelaunchItem);
+        transaction.addTransactionItem(lifecycleRequest);
         executeTransaction(transaction);
     }
 

@@ -893,7 +893,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mTaskSupervisor.onSystemReady();
             mActivityClientController.onSystemReady();
             // TODO(b/258792202) Cleanup once ASM is ready to launch
-            ActivitySecurityModelFeatureFlags.initialize(mContext.getMainExecutor(), pm);
+            ActivitySecurityModelFeatureFlags.initialize(mContext.getMainExecutor());
             mGrammaticalManagerInternal = LocalServices.getService(
                     GrammaticalInflectionManagerInternal.class);
         }
@@ -1337,9 +1337,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             IBinder allowlistToken, Intent fillInIntent, String resolvedType, IBinder resultTo,
             String resultWho, int requestCode, int flagsMask, int flagsValues, Bundle bOptions) {
         enforceNotIsolatedCaller("startActivityIntentSender");
-        // Refuse possible leaked file descriptors
-        if (fillInIntent != null && fillInIntent.hasFileDescriptors()) {
-            throw new IllegalArgumentException("File descriptors passed in Intent");
+        if (fillInIntent != null) {
+            // Refuse possible leaked file descriptors
+            if (fillInIntent.hasFileDescriptors()) {
+                throw new IllegalArgumentException("File descriptors passed in Intent");
+            }
+            // Remove existing mismatch flag so it can be properly updated later
+            fillInIntent.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
         }
 
         if (!(target instanceof PendingIntentRecord)) {
@@ -1383,6 +1387,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 return false;
             }
             intent = new Intent(intent);
+            // Remove existing mismatch flag so it can be properly updated later
+            intent.removeExtendedFlags(Intent.EXTENDED_FLAG_FILTER_MISMATCH);
             // The caller is not allowed to change the data.
             intent.setDataAndType(r.intent.getData(), r.intent.getType());
             // And we are resetting to find the next component...
@@ -3544,10 +3550,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
             final long callingIdentity = Binder.clearCallingIdentity();
             try {
-                hasRestrictedWindow = displayContent.forAllWindows(windowState -> {
-                    return windowState.isOnScreen() && UserManager.isUserTypePrivateProfile(
-                            getUserManager().getProfileType(windowState.mShowUserId));
-                }, true /* traverseTopToBottom */);
+                hasRestrictedWindow = displayContent.forAllWindows(
+                        windowState -> windowState.isOnScreen() && (
+                                UserManager.isUserTypePrivateProfile(
+                                        getUserManager().getProfileType(windowState.mShowUserId))
+                                        || hasUserRestriction(
+                                        UserManager.DISALLOW_ASSIST_CONTENT,
+                                        windowState.mShowUserId)), true /* traverseTopToBottom */);
             } finally {
                 Binder.restoreCallingIdentity(callingIdentity);
             }
@@ -5592,7 +5601,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * Saves the current activity manager state and includes the saved state in the next dump of
      * activity manager.
      */
-    void saveANRState(String reason) {
+    void saveANRState(ActivityRecord activity, String reason) {
         final StringWriter sw = new StringWriter();
         final PrintWriter pw = new FastPrintWriter(sw, false, 1024);
         pw.println("  ANR time: " + DateFormat.getDateTimeInstance().format(new Date()));
@@ -5600,14 +5609,25 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             pw.println("  Reason: " + reason);
         }
         pw.println();
-        getActivityStartController().dump(pw, "  ", null);
-        pw.println();
+        if (activity != null) {
+            final Task rootTask = activity.getRootTask();
+            if (rootTask != null) {
+                rootTask.forAllTaskFragments(
+                        tf -> tf.dumpInner("  ", pw, true /* dumpAll */, null /* dumpPackage */));
+                pw.println();
+            }
+            mActivityStartController.dump(pw, "  ", activity.packageName);
+            if (mActivityStartController.getLastStartActivity() != activity) {
+                activity.dump(pw, "  ", true /* dumpAll */);
+            }
+        }
+        ActivityTaskSupervisor.printThisActivity(pw, mRootWindowContainer.getTopResumedActivity(),
+                null /* dumpPackage */, INVALID_DISPLAY, true /* needSep */,
+                "  ResumedActivity: ", /* header= */ null /* header */);
+        mLockTaskController.dump(pw, "  ");
+        mKeyguardController.dump(pw, "  ");
         pw.println("-------------------------------------------------------------------"
                 + "------------");
-        dumpActivitiesLocked(null /* fd */, pw, null /* args */, 0 /* opti */,
-                true /* dumpAll */, false /* dumpClient */, null /* dumpPackage */,
-                INVALID_DISPLAY, "" /* header */);
-        pw.println();
         pw.close();
 
         mLastANRState = sw.toString();
@@ -6375,7 +6395,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             final NeededUriGrants dataGrants = collectGrants(data, r);
 
             synchronized (mGlobalLock) {
-                r.sendResult(callingUid, resultWho, requestCode, resultCode, data, dataGrants);
+                r.sendResult(callingUid, resultWho, requestCode, resultCode, data, new Binder(),
+                        dataGrants);
             }
         }
 
