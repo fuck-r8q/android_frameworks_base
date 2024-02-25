@@ -17,12 +17,13 @@
 package com.android.systemui.communal.ui.viewmodel
 
 import android.content.ComponentName
+import android.os.UserHandle
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.communal.shared.model.ObservableCommunalTransitionState
 import com.android.systemui.communal.widgets.WidgetConfigurator
-import com.android.systemui.media.controls.ui.MediaHost
+import com.android.systemui.media.controls.ui.view.MediaHost
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,10 +63,11 @@ abstract class BaseCommunalViewModel(
      */
     open fun onAddWidget(
         componentName: ComponentName,
+        user: UserHandle,
         priority: Int,
         configurator: WidgetConfigurator? = null
     ) {
-        communalInteractor.addWidget(componentName, priority, configurator)
+        communalInteractor.addWidget(componentName, user, priority, configurator)
     }
 
     /** A list of all the communal content to be displayed in the communal hub. */

@@ -222,7 +222,7 @@ public class GrammaticalInflectionService extends SystemService {
         }
 
         final int uid = mPackageManagerInternal.getPackageUid(appPackageName, 0, userId);
-        FrameworkStatsLog.write(FrameworkStatsLog.GRAMMATICAL_INFLECTION_CHANGED,
+        FrameworkStatsLog.write(FrameworkStatsLog.APPLICATION_GRAMMATICAL_INFLECTION_CHANGED,
                 FrameworkStatsLog.APPLICATION_GRAMMATICAL_INFLECTION_CHANGED__SOURCE_ID__OTHERS,
                 uid,
                 gender != GRAMMATICAL_GENDER_NOT_SPECIFIED,
@@ -266,8 +266,14 @@ public class GrammaticalInflectionService extends SystemService {
 
         try {
             Configuration config = new Configuration();
+            int preValue = config.getGrammaticalGender();
             config.setGrammaticalGender(grammaticalGender);
             ActivityTaskManager.getService().updateConfiguration(config);
+            FrameworkStatsLog.write(FrameworkStatsLog.SYSTEM_GRAMMATICAL_INFLECTION_CHANGED,
+                    FrameworkStatsLog.SYSTEM_GRAMMATICAL_INFLECTION_CHANGED__SOURCE_ID__SYSTEM,
+                    userId,
+                    grammaticalGender != GRAMMATICAL_GENDER_NOT_SPECIFIED,
+                    preValue != GRAMMATICAL_GENDER_NOT_SPECIFIED);
         } catch (RemoteException e) {
             Log.w(TAG, "Can not update configuration", e);
         }
@@ -329,8 +335,9 @@ public class GrammaticalInflectionService extends SystemService {
 
     private void checkCallerIsSystem() {
         int callingUid = Binder.getCallingUid();
-        if (callingUid != Process.SYSTEM_UID && callingUid != Process.SHELL_UID) {
-            throw new SecurityException("Caller is not system and shell.");
+        if (callingUid != Process.SYSTEM_UID && callingUid != Process.SHELL_UID
+                && callingUid != Process.ROOT_UID) {
+            throw new SecurityException("Caller is not system, shell and root.");
         }
     }
 
@@ -354,12 +361,11 @@ public class GrammaticalInflectionService extends SystemService {
             final File file = getGrammaticalGenderFile(userId);
             synchronized (mLock) {
                 if (!file.exists()) {
-                    Log.d(TAG, "User " + userId + "doesn't have the grammatical gender file.");
+                    Log.d(TAG, "User " + userId + " doesn't have the grammatical gender file.");
                     return;
                 }
                 if (mGrammaticalGenderCache.indexOfKey(userId) < 0) {
-                    try {
-                        InputStream in = new FileInputStream(file);
+                    try (FileInputStream in = new FileInputStream(file)) {
                         final TypedXmlPullParser parser = Xml.resolvePullParser(in);
                         mGrammaticalGenderCache.put(userId, getGrammaticalGenderFromXml(parser));
                     } catch (IOException | XmlPullParserException e) {

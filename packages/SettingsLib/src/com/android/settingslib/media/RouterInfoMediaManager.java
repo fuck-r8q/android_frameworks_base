@@ -65,9 +65,9 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
             };
 
     // TODO (b/321969740): Plumb target UserHandle between UMO and RouterInfoMediaManager.
-    public RouterInfoMediaManager(
+    /* package */ RouterInfoMediaManager(
             Context context,
-            String packageName,
+            @NonNull String packageName,
             Notification notification,
             LocalBluetoothManager localBluetoothManager)
             throws PackageNotAvailableException {
@@ -111,17 +111,6 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
         mRouter.unregisterTransferCallback(mTransferCallback);
         mRouter.unregisterRouteListingPreferenceUpdatedCallback(mRouteListingPreferenceCallback);
         mRouter.unregisterRouteCallback(mRouteCallback);
-    }
-
-    @Override
-    protected boolean connectDeviceWithoutPackageName(@NonNull MediaDevice device) {
-        if (device.mRouteInfo == null) {
-            return false;
-        }
-
-        RoutingController controller = mRouter.getSystemController();
-        mRouter.transfer(controller, device.mRouteInfo);
-        return true;
     }
 
     @Override
@@ -237,12 +226,6 @@ public final class RouterInfoMediaManager extends InfoMediaManager {
 
         RoutingSessionInfo systemSession = mRouterManager.getSystemRoutingSession(null);
         return TextUtils.equals(systemSession.getId(), sessionId) ? systemSession : null;
-    }
-
-    @NonNull
-    @Override
-    protected List<MediaRoute2Info> getAllRoutes() {
-        return mRouter.getAllRoutes();
     }
 
     @NonNull

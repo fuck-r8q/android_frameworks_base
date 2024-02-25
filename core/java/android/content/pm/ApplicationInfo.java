@@ -1580,6 +1580,14 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     private Boolean requestRawExternalStorageAccess;
 
     /**
+     * If {@code false}, this app does not allow its activities to be replaced by another app.
+     * Is set from application manifest application tag's allowCrossUidActivitySwitchFromBelow
+     * attribute.
+     * @hide
+     */
+    public boolean allowCrossUidActivitySwitchFromBelow = true;
+
+    /**
      * Represents the default policy. The actual policy used will depend on other properties of
      * the application, e.g. the target SDK version.
      * @hide
@@ -1775,6 +1783,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
                         + Integer.toHexString(localeConfigRes));
             }
             pw.println(prefix + "enableOnBackInvokedCallback=" + isOnBackInvokedCallbackEnabled());
+            pw.println(prefix + "allowCrossUidActivitySwitchFromBelow="
+                    + allowCrossUidActivitySwitchFromBelow);
+
         }
         pw.println(prefix + "createTimestamp=" + createTimestamp);
         if (mKnownActivityEmbeddingCerts != null) {
@@ -1892,6 +1903,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
                 proto.write(ApplicationInfoProto.Detail.NATIVE_HEAP_ZERO_INIT,
                         nativeHeapZeroInitialized);
             }
+            proto.write(ApplicationInfoProto.Detail.ALLOW_CROSS_UID_ACTIVITY_SWITCH_FROM_BELOW,
+                    allowCrossUidActivitySwitchFromBelow);
             proto.end(detailToken);
         }
         if (!ArrayUtils.isEmpty(mKnownActivityEmbeddingCerts)) {
@@ -2019,6 +2032,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         nativeHeapZeroInitialized = orig.nativeHeapZeroInitialized;
         requestRawExternalStorageAccess = orig.requestRawExternalStorageAccess;
         localeConfigRes = orig.localeConfigRes;
+        allowCrossUidActivitySwitchFromBelow = orig.allowCrossUidActivitySwitchFromBelow;
         createTimestamp = SystemClock.uptimeMillis();
     }
 
@@ -2125,6 +2139,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             }
         }
         dest.writeInt(localeConfigRes);
+        dest.writeInt(allowCrossUidActivitySwitchFromBelow ? 1 : 0);
+
         sForStringSet.parcel(mKnownActivityEmbeddingCerts, dest, flags);
     }
 
@@ -2225,6 +2241,8 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
             }
         }
         localeConfigRes = source.readInt();
+        allowCrossUidActivitySwitchFromBelow = source.readInt() != 0;
+
         mKnownActivityEmbeddingCerts = sForStringSet.unparcel(source);
         if (mKnownActivityEmbeddingCerts.isEmpty()) {
             mKnownActivityEmbeddingCerts = null;

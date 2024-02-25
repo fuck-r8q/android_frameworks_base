@@ -649,6 +649,74 @@ public class ZenModeHelperTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_MODES_API)
+    public void testTotalSilence_consolidatedPolicyDisallowsAll() {
+        // Start with zen mode off just to make sure global/manual mode isn't doing anything.
+        mZenModeHelper.mZenMode = ZEN_MODE_OFF;
+
+        // Create a zen rule that calls for total silence via zen mode, but does not specify any
+        // particular policy. This confirms that the application of the policy is based only on the
+        // actual zen mode setting.
+        AutomaticZenRule azr = new AutomaticZenRule.Builder("OriginalName", CONDITION_ID)
+                .setInterruptionFilter(INTERRUPTION_FILTER_NONE)
+                .build();
+        String ruleId = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(),
+                azr, UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI, "reason", Process.SYSTEM_UID);
+
+        // Enable rule
+        mZenModeHelper.setAutomaticZenRuleState(ruleId,
+                new Condition(azr.getConditionId(), "", STATE_TRUE),
+                UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI,
+                Process.SYSTEM_UID);
+
+        // Confirm that the consolidated policy doesn't allow anything
+        NotificationManager.Policy policy = mZenModeHelper.getConsolidatedNotificationPolicy();
+        assertThat(policy.allowAlarms()).isFalse();
+        assertThat(policy.allowMedia()).isFalse();
+        assertThat(policy.allowCalls()).isFalse();
+        assertThat(policy.allowMessages()).isFalse();
+        assertThat(policy.allowConversations()).isFalse();
+        assertThat(policy.allowEvents()).isFalse();
+        assertThat(policy.allowReminders()).isFalse();
+        assertThat(policy.allowRepeatCallers()).isFalse();
+        assertThat(policy.allowPriorityChannels()).isFalse();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MODES_API)
+    public void testAlarmsOnly_consolidatedPolicyOnlyAllowsAlarmsAndMedia() {
+        // Start with zen mode off just to make sure global/manual mode isn't doing anything.
+        mZenModeHelper.mZenMode = ZEN_MODE_OFF;
+
+        // Create a zen rule that calls for alarms only via zen mode, but does not specify any
+        // particular policy. This confirms that the application of the policy is based only on the
+        // actual zen mode setting.
+        AutomaticZenRule azr = new AutomaticZenRule.Builder("OriginalName", CONDITION_ID)
+                .setInterruptionFilter(INTERRUPTION_FILTER_ALARMS)
+                .build();
+        String ruleId = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(),
+                azr, UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI, "reason", Process.SYSTEM_UID);
+
+        // Enable rule
+        mZenModeHelper.setAutomaticZenRuleState(ruleId,
+                new Condition(azr.getConditionId(), "", STATE_TRUE),
+                UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI,
+                Process.SYSTEM_UID);
+
+        // Confirm that the consolidated policy allows only alarms and media and nothing else
+        NotificationManager.Policy policy = mZenModeHelper.getConsolidatedNotificationPolicy();
+        assertThat(policy.allowAlarms()).isTrue();
+        assertThat(policy.allowMedia()).isTrue();
+        assertThat(policy.allowCalls()).isFalse();
+        assertThat(policy.allowMessages()).isFalse();
+        assertThat(policy.allowConversations()).isFalse();
+        assertThat(policy.allowEvents()).isFalse();
+        assertThat(policy.allowReminders()).isFalse();
+        assertThat(policy.allowRepeatCallers()).isFalse();
+        assertThat(policy.allowPriorityChannels()).isFalse();
+    }
+
+    @Test
     public void testZenUpgradeNotification() {
         /**
          * Commit a485ec65b5ba947d69158ad90905abf3310655cf disabled DND status change
@@ -5316,11 +5384,53 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         ZenRule rule = new ZenRule();
         rule.pkg = pkg;
         rule.creationTime = createdAt.toEpochMilli();
+        rule.enabled = true;
         rule.deletionInstant = deletedAt;
         // Plus stuff so that isValidAutomaticRule() passes
         rule.name = "A rule from " + pkg + " created on " + createdAt;
         rule.conditionId = Uri.parse(rule.name);
         return rule;
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MODES_API)
+    public void getAutomaticZenRuleState_ownedRule_returnsRuleState() {
+        String id = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(),
+                new AutomaticZenRule.Builder("Rule", CONDITION_ID)
+                        .setConfigurationActivity(
+                                new ComponentName(mContext.getPackageName(), "Blah"))
+                        .build(),
+                UPDATE_ORIGIN_APP, "reasons", CUSTOM_PKG_UID);
+
+        // Null condition -> STATE_FALSE
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(id)).isEqualTo(Condition.STATE_FALSE);
+
+        mZenModeHelper.setAutomaticZenRuleState(id, CONDITION_TRUE, UPDATE_ORIGIN_APP,
+                CUSTOM_PKG_UID);
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(id)).isEqualTo(Condition.STATE_TRUE);
+
+        mZenModeHelper.setAutomaticZenRuleState(id, CONDITION_FALSE, UPDATE_ORIGIN_APP,
+                CUSTOM_PKG_UID);
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(id)).isEqualTo(Condition.STATE_FALSE);
+
+        mZenModeHelper.removeAutomaticZenRule(id, UPDATE_ORIGIN_APP, "", CUSTOM_PKG_UID);
+        assertThat(mZenModeHelper.getAutomaticZenRuleState(id)).isEqualTo(Condition.STATE_UNKNOWN);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MODES_API)
+    public void getAutomaticZenRuleState_notOwnedRule_returnsStateUnknown() {
+        // Assume existence of a system-owned rule that is currently ACTIVE.
+        ZenRule systemRule = newZenRule("android", Instant.now(), null);
+        systemRule.zenMode = ZEN_MODE_ALARMS;
+        systemRule.condition = new Condition(systemRule.conditionId, "on", Condition.STATE_TRUE);
+        ZenModeConfig config = mZenModeHelper.mConfig.copy();
+        config.automaticRules.put("systemRule", systemRule);
+        mZenModeHelper.setConfig(config, null, UPDATE_ORIGIN_INIT, "", Process.SYSTEM_UID);
+        assertThat(mZenModeHelper.getZenMode()).isEqualTo(ZEN_MODE_ALARMS);
+
+        assertThat(mZenModeHelper.getAutomaticZenRuleState("systemRule")).isEqualTo(
+                Condition.STATE_UNKNOWN);
     }
 
     @Test

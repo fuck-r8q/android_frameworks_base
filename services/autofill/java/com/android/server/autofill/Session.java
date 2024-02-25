@@ -2766,6 +2766,10 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                     + id + " destroyed");
             return;
         }
+        if (sDebug) {
+            Slog.d(TAG, "setAuthenticationResultLocked(): id= " + authenticationId
+                    + ", data=" + data);
+        }
         final int requestId = AutofillManager.getRequestIdFromAuthenticationId(authenticationId);
         if (requestId == AUGMENTED_AUTOFILL_REQUEST_ID) {
             setAuthenticationResultForAugmentedAutofillLocked(data, authenticationId);
@@ -2819,12 +2823,18 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                     + ", clientState=" + newClientState + ", authenticationId=" + authenticationId);
         }
         if (result instanceof FillResponse) {
+            if (sDebug) {
+                Slog.d(TAG, "setAuthenticationResultLocked(): received FillResponse from"
+                        + " authentication flow");
+            }
             logAuthenticationStatusLocked(requestId, MetricsEvent.AUTOFILL_AUTHENTICATED);
             mPresentationStatsEventLogger.maybeSetAuthenticationResult(
                 AUTHENTICATION_RESULT_SUCCESS);
             replaceResponseLocked(authenticatedResponse, (FillResponse) result, newClientState);
         } else if (result instanceof GetCredentialResponse) {
-            Slog.d(TAG, "Received GetCredentialResponse from authentication flow");
+            if (sDebug) {
+                Slog.d(TAG, "Received GetCredentialResponse from authentication flow");
+            }
             boolean isCredmanCallbackInvoked = false;
             if (Flags.autofillCredmanIntegration()) {
                 GetCredentialResponse response = (GetCredentialResponse) result;
@@ -2839,6 +2849,10 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 }
             }
         } else if (result instanceof Dataset) {
+            if (sDebug) {
+                Slog.d(TAG, "setAuthenticationResultLocked(): received Dataset from"
+                        + " authentication flow");
+            }
             if (datasetIdx != AutofillManager.AUTHENTICATION_ID_DATASET_ID_UNDEFINED) {
                 logAuthenticationStatusLocked(requestId,
                         MetricsEvent.AUTOFILL_DATASET_AUTHENTICATED);
@@ -5088,12 +5102,13 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                         }
                     }
                 } else if (resultCode == FAILURE_CREDMAN_SELECTOR) {
-                    GetCredentialException exception =  resultData.getParcelable(
-                            CredentialProviderService.EXTRA_GET_CREDENTIAL_EXCEPTION,
-                            GetCredentialException.class);
-                    Slog.d(TAG, "Credman bottom sheet from pinned "
-                            + "entry failed with: + " + exception.getType() + " , "
-                            + exception.getMessage());
+                    String[] exception =  resultData.getStringArray(
+                            CredentialProviderService.EXTRA_GET_CREDENTIAL_EXCEPTION);
+                    if (exception != null && exception.length >= 2) {
+                        Slog.w(TAG, "Credman bottom sheet from pinned "
+                                + "entry failed with: + " + exception[0] + " , "
+                                + exception[1]);
+                    }
                 } else {
                     Slog.d(TAG, "Unknown resultCode from credential "
                             + "manager bottom sheet: " + resultCode);

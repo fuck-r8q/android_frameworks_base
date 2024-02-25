@@ -2345,6 +2345,7 @@ public final class AutofillManager {
 
         synchronized (mLock) {
             if (!isActiveLocked()) {
+                Log.w(TAG, "onAuthenticationResult(): sessionId=" + mSessionId + " not active");
                 return;
             }
             mState = STATE_ACTIVE;
@@ -2361,6 +2362,7 @@ public final class AutofillManager {
             }
             if (data == null) {
                 // data is set to null when result is not RESULT_OK
+                Log.i(TAG, "onAuthenticationResult(): empty intent");
                 return;
             }
 

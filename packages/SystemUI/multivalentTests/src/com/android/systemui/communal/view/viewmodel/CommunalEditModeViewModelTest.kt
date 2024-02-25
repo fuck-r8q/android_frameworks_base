@@ -30,6 +30,7 @@ import com.android.systemui.communal.data.repository.fakeCommunalMediaRepository
 import com.android.systemui.communal.data.repository.fakeCommunalTutorialRepository
 import com.android.systemui.communal.data.repository.fakeCommunalWidgetRepository
 import com.android.systemui.communal.domain.interactor.communalInteractor
+import com.android.systemui.communal.domain.interactor.communalSettingsInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.log.CommunalUiEvent
 import com.android.systemui.communal.shared.model.CommunalWidgetContentModel
@@ -37,7 +38,7 @@ import com.android.systemui.communal.ui.viewmodel.CommunalEditModeViewModel
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.log.logcatLogBuffer
-import com.android.systemui.media.controls.ui.MediaHost
+import com.android.systemui.media.controls.ui.view.MediaHost
 import com.android.systemui.smartspace.data.repository.FakeSmartspaceRepository
 import com.android.systemui.smartspace.data.repository.fakeSmartspaceRepository
 import com.android.systemui.testKosmos
@@ -81,6 +82,7 @@ class CommunalEditModeViewModelTest : SysuiTestCase() {
         underTest =
             CommunalEditModeViewModel(
                 kosmos.communalInteractor,
+                kosmos.communalSettingsInteractor,
                 mediaHost,
                 uiEventLogger,
                 logcatLogBuffer("CommunalEditModeViewModelTest"),

@@ -56,6 +56,7 @@ import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.DeviceIntegrationUtils;
 import android.os.Process;
@@ -94,6 +95,11 @@ public class BackgroundActivityStartController {
     private static final long ASM_GRACEPERIOD_TIMEOUT_MS = TIMEOUT_MS;
     private static final int ASM_GRACEPERIOD_MAX_REPEATS = 5;
     private static final int NO_PROCESS_UID = -1;
+
+    static final String AUTO_OPT_IN_NOT_PENDING_INTENT = "notPendingIntent";
+    static final String AUTO_OPT_IN_CALL_FOR_RESULT = "callForResult";
+    static final String AUTO_OPT_IN_SAME_UID = "sameUid";
+
     /** If enabled the creator will not allow BAL on its behalf by default. */
     @ChangeId
     @EnabledAfter(targetSdkVersion = UPSIDE_DOWN_CAKE)
@@ -232,9 +238,9 @@ public class BackgroundActivityStartController {
         private final boolean mCallingUidHasAnyVisibleWindow;
         private final @ActivityManager.ProcessState int mCallingUidProcState;
         private final boolean mIsCallingUidPersistentSystemProcess;
-        private final BackgroundStartPrivileges mBalAllowedByPiSender;
-        private final BackgroundStartPrivileges mBalAllowedByPiCreatorWithHardening;
-        private final BackgroundStartPrivileges mBalAllowedByPiCreator;
+        final BackgroundStartPrivileges mBalAllowedByPiSender;
+        final BackgroundStartPrivileges mBalAllowedByPiCreatorWithHardening;
+        final BackgroundStartPrivileges mBalAllowedByPiCreator;
         private final String mRealCallingPackage;
         private final int mRealCallingUid;
         private final int mRealCallingPid;
@@ -248,11 +254,12 @@ public class BackgroundActivityStartController {
         private final WindowProcessController mRealCallerApp;
         private final boolean mIsCallForResult;
         private final ActivityOptions mCheckedOptions;
-        private final String mAutoOptInReason;
+        final String mAutoOptInReason;
+        private final boolean mAutoOptInCaller;
         private BalVerdict mResultForCaller;
         private BalVerdict mResultForRealCaller;
 
-        private BalState(int callingUid, int callingPid, final String callingPackage,
+        @VisibleForTesting BalState(int callingUid, int callingPid, final String callingPackage,
                  int realCallingUid, int realCallingPid,
                  WindowProcessController callerApp,
                  PendingIntentRecord originatingPendingIntent,
@@ -280,26 +287,27 @@ public class BackgroundActivityStartController {
             if (!balImproveRealCallerVisibilityCheck()) {
                 // without this fix the auto-opt ins below would violate CTS tests
                 mAutoOptInReason = null;
-            } else if (mIsCallForResult) {
-                mAutoOptInReason = "callForResult";
+                mAutoOptInCaller = false;
             } else if (originatingPendingIntent == null) {
-                mAutoOptInReason = "notPendingIntent";
+                mAutoOptInReason = AUTO_OPT_IN_NOT_PENDING_INTENT;
+                mAutoOptInCaller = true;
+            } else if (mIsCallForResult) {
+                mAutoOptInReason = AUTO_OPT_IN_CALL_FOR_RESULT;
+                mAutoOptInCaller = false;
             } else if (callingUid == realCallingUid && !balRequireOptInSameUid()) {
-                mAutoOptInReason = "sameUid";
+                mAutoOptInReason = AUTO_OPT_IN_SAME_UID;
+                mAutoOptInCaller = false;
             } else {
                 mAutoOptInReason = null;
+                mAutoOptInCaller = false;
             }
 
-            if (mAutoOptInReason != null) {
+            if (mAutoOptInCaller) {
                 // grant BAL privileges unless explicitly opted out
                 mBalAllowedByPiCreatorWithHardening = mBalAllowedByPiCreator =
                         callerBackgroundActivityStartMode == MODE_BACKGROUND_ACTIVITY_START_DENIED
                                 ? BackgroundStartPrivileges.NONE
                                 : BackgroundStartPrivileges.ALLOW_BAL;
-                mBalAllowedByPiSender = realCallerBackgroundActivityStartMode
-                        == MODE_BACKGROUND_ACTIVITY_START_DENIED
-                        ? BackgroundStartPrivileges.NONE
-                        : BackgroundStartPrivileges.ALLOW_BAL;
             } else {
                 // for PendingIntents we restrict BAL based on target_sdk
                 mBalAllowedByPiCreatorWithHardening = getBackgroundStartPrivilegesAllowedByCreator(
@@ -312,10 +320,21 @@ public class BackgroundActivityStartController {
                 mBalAllowedByPiCreator = balRequireOptInByPendingIntentCreator()
                         ? mBalAllowedByPiCreatorWithHardening
                         : mBalAllowedByPiCreatorWithoutHardening;
+            }
+
+            if (mAutoOptInReason != null) {
+                // grant BAL privileges unless explicitly opted out
+                mBalAllowedByPiSender = realCallerBackgroundActivityStartMode
+                        == MODE_BACKGROUND_ACTIVITY_START_DENIED
+                        ? BackgroundStartPrivileges.NONE
+                        : BackgroundStartPrivileges.ALLOW_BAL;
+            } else {
+                // for PendingIntents we restrict BAL based on target_sdk
                 mBalAllowedByPiSender =
                         PendingIntentRecord.getBackgroundStartPrivilegesAllowedByCaller(
                                 checkedOptions, realCallingUid, mRealCallingPackage);
             }
+
             mAppSwitchState = mService.getBalAppSwitchesState();
             mCallingUidProcState = mService.mActiveUids.getUidState(callingUid);
             mIsCallingUidPersistentSystemProcess =
@@ -407,7 +426,7 @@ public class BackgroundActivityStartController {
             return mRealCallingUid != NO_PROCESS_UID;
         }
 
-        private boolean isPendingIntent() {
+        boolean isPendingIntent() {
             return mOriginatingPendingIntent != null && hasRealCaller();
         }
 
@@ -485,23 +504,19 @@ public class BackgroundActivityStartController {
         }
 
         public boolean callerExplicitOptInOrAutoOptIn() {
-            if (mAutoOptInReason == null) {
-                return mCheckedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
-                        == MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
-            } else {
-                return mCheckedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
-                        != MODE_BACKGROUND_ACTIVITY_START_DENIED;
+            if (mAutoOptInCaller) {
+                return !callerExplicitOptOut();
             }
+            return mCheckedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
+                    == MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
         }
 
         public boolean realCallerExplicitOptInOrAutoOptIn() {
-            if (mAutoOptInReason == null) {
-                return mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
-                        == MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
-            } else {
-                return mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
-                        != MODE_BACKGROUND_ACTIVITY_START_DENIED;
+            if (mAutoOptInReason != null) {
+                return !realCallerExplicitOptOut();
             }
+            return mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
+                    == MODE_BACKGROUND_ACTIVITY_START_ALLOWED;
         }
 
         public boolean callerExplicitOptOut() {
@@ -523,6 +538,11 @@ public class BackgroundActivityStartController {
             return mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
                     != MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED;
         }
+
+        @Override
+        public String toString() {
+            return dump();
+        }
     }
 
     static class BalVerdict {
@@ -530,6 +550,9 @@ public class BackgroundActivityStartController {
         static final BalVerdict BLOCK = new BalVerdict(BAL_BLOCK, false, "Blocked");
         static final BalVerdict ALLOW_BY_DEFAULT =
                 new BalVerdict(BAL_ALLOW_DEFAULT, false, "Default");
+        // Careful using this - it will bypass all ASM checks.
+        static final BalVerdict ALLOW_PRIVILEGED =
+                new BalVerdict(BAL_ALLOW_ALLOWLISTED_UID, false, "PRIVILEGED");
         private final @BalCode int mCode;
         private final boolean mBackground;
         private final String mMessage;
@@ -723,9 +746,8 @@ public class BackgroundActivityStartController {
             // Allowed before V by creator
             if (state.mBalAllowedByPiCreator.allowsBackgroundActivityStarts()) {
                 Slog.wtf(TAG, "With Android 15 BAL hardening this activity start may be blocked"
-                                + " if the PI creator upgrades target_sdk to 35+! "
-                                + " (missing opt in by PI creator)! "
-                                + state.dump());
+                        + " if the PI creator upgrades target_sdk to 35+! "
+                        + " (missing opt in by PI creator)!" + state.dump());
                 showBalRiskToast();
                 return allowBasedOnCaller(state);
             }
@@ -734,17 +756,15 @@ public class BackgroundActivityStartController {
             // Allowed before U by sender
             if (state.mBalAllowedByPiSender.allowsBackgroundActivityStarts()) {
                 Slog.wtf(TAG, "With Android 14 BAL hardening this activity start will be blocked"
-                                + " if the PI sender upgrades target_sdk to 34+! "
-                                + " (missing opt in by PI sender)! "
-                                + state.dump());
+                        + " if the PI sender upgrades target_sdk to 34+! "
+                        + " (missing opt in by PI sender)!" + state.dump());
                 showBalRiskToast();
                 return allowBasedOnRealCaller(state);
             }
         }
         // caller or real caller could start the activity, but would need to explicitly opt in
         if (callerCanAllow || realCallerCanAllow) {
-            Slog.wtf(TAG, "Without BAL hardening this activity start would be allowed "
-                            + state.dump());
+            Slog.w(TAG, "Without BAL hardening this activity start would be allowed");
         }
         // neither the caller not the realCaller can allow or have explicitly opted out
         return abortLaunch(state);
@@ -767,7 +787,7 @@ public class BackgroundActivityStartController {
     }
 
     private BalVerdict abortLaunch(BalState state) {
-        Slog.w(TAG, "Background activity launch blocked! "
+        Slog.wtf(TAG, "Background activity launch blocked! "
                 + state.dump());
         showBalBlockedToast();
         return statsLog(BalVerdict.BLOCK, state);
@@ -979,7 +999,7 @@ public class BackgroundActivityStartController {
      * String, int, boolean, boolean, boolean, long, long, long)} for details on the
      * exceptions.
      */
-    private BalVerdict checkProcessAllowsBal(WindowProcessController app,
+    @VisibleForTesting BalVerdict checkProcessAllowsBal(WindowProcessController app,
             BalState state) {
         if (app == null) {
             return BalVerdict.BLOCK;
@@ -1242,7 +1262,8 @@ public class BackgroundActivityStartController {
         boolean shouldBlockActivityStart = ActivitySecurityModelFeatureFlags
                 .shouldRestrictActivitySwitch(callingUid);
         int[] finishCount = new int[0];
-        if (shouldBlockActivityStart) {
+        if (shouldBlockActivityStart
+                && blockCrossUidActivitySwitchFromBelowForActivity(targetTaskTop)) {
             ActivityRecord activity = targetTask.getActivity(isLaunchingOrLaunched);
             if (activity == null) {
                 // mStartActivity is not in task, so clear everything
@@ -1327,7 +1348,7 @@ public class BackgroundActivityStartController {
 
         boolean restrictActivitySwitch = ActivitySecurityModelFeatureFlags
                 .shouldRestrictActivitySwitch(callingUid)
-                && bas.mBlockActivityStartIfFlagEnabled;
+                        && bas.mBlockActivityStartIfFlagEnabled;
 
         PackageManager pm = mService.mContext.getPackageManager();
         String callingPackage = pm.getNameForUid(callingUid);
@@ -1381,19 +1402,19 @@ public class BackgroundActivityStartController {
             int uid, @Nullable ActivityRecord sourceRecord) {
         // If the source is visible, consider it 'top'.
         if (sourceRecord != null && sourceRecord.isVisibleRequested()) {
-            return new BlockActivityStart(false, false);
+            return BlockActivityStart.ACTIVITY_START_ALLOWED;
         }
 
         // Always allow actual top activity to clear task
         ActivityRecord topActivity = task.getTopMostActivity();
         if (topActivity != null && topActivity.isUid(uid)) {
-            return new BlockActivityStart(false, false);
+            return BlockActivityStart.ACTIVITY_START_ALLOWED;
         }
 
         // If UID is visible in target task, allow launch
         if (task.forAllActivities((Predicate<ActivityRecord>)
                 ar -> ar.isUid(uid) && ar.isVisibleRequested())) {
-            return new BlockActivityStart(false, false);
+            return BlockActivityStart.ACTIVITY_START_ALLOWED;
         }
 
         // Consider the source activity, whether or not it is finishing. Do not consider any other
@@ -1460,12 +1481,11 @@ public class BackgroundActivityStartController {
     private BlockActivityStart blockCrossUidActivitySwitchFromBelow(ActivityRecord ar,
             int sourceUid) {
         if (ar.isUid(sourceUid)) {
-            return new BlockActivityStart(false, false);
+            return BlockActivityStart.ACTIVITY_START_ALLOWED;
         }
 
-        // If mAllowCrossUidActivitySwitchFromBelow is set, honor it.
-        if (ar.mAllowCrossUidActivitySwitchFromBelow) {
-            return new BlockActivityStart(false, false);
+        if (!blockCrossUidActivitySwitchFromBelowForActivity(ar)) {
+            return BlockActivityStart.ACTIVITY_START_ALLOWED;
         }
 
         // At this point, we would block if the feature is launched and both apps were V+
@@ -1476,8 +1496,11 @@ public class BackgroundActivityStartController {
                 ActivitySecurityModelFeatureFlags.shouldRestrictActivitySwitch(ar.getUid())
                         && ActivitySecurityModelFeatureFlags
                         .shouldRestrictActivitySwitch(sourceUid);
-        return new BackgroundActivityStartController
-                .BlockActivityStart(restrictActivitySwitch, true);
+        if (restrictActivitySwitch) {
+            return BlockActivityStart.BLOCK;
+        } else {
+            return BlockActivityStart.LOG_ONLY;
+        }
     }
 
     /**
@@ -1683,14 +1706,52 @@ public class BackgroundActivityStartController {
         }
     }
 
-    static class BlockActivityStart {
+    /**
+     * Activity level allowCrossUidActivitySwitchFromBelow defaults to false.
+     * Package level defaults to true.
+     * We block the launch if dev has explicitly set package level to false, and activity level has
+     * not opted out
+     */
+    private boolean blockCrossUidActivitySwitchFromBelowForActivity(@NonNull ActivityRecord ar) {
+        // We don't need to check package level if activity has opted out.
+        if (ar.mAllowCrossUidActivitySwitchFromBelow) {
+            return false;
+        }
+
+        if (ActivitySecurityModelFeatureFlags.asmRestrictionsEnabledForAll()) {
+            return true;
+        }
+
+        String packageName = ar.packageName;
+        if (packageName == null) {
+            return false;
+        }
+
+        PackageManager pm = mService.mContext.getPackageManager();
+        ApplicationInfo applicationInfo;
+
+        try {
+            applicationInfo = pm.getApplicationInfo(packageName, 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            Slog.wtf(TAG, "Package name: " + packageName + " not found.");
+            return false;
+        }
+
+        return !applicationInfo.allowCrossUidActivitySwitchFromBelow;
+    }
+
+    private static class BlockActivityStart {
+        private static final BlockActivityStart ACTIVITY_START_ALLOWED =
+                new BlockActivityStart(false, false);
+        private static final BlockActivityStart LOG_ONLY = new BlockActivityStart(false, true);
+        private static final BlockActivityStart BLOCK = new BlockActivityStart(true, true);
         // We should block if feature flag is enabled
         private final boolean mBlockActivityStartIfFlagEnabled;
         // Used for logging/toasts. Would we block if target sdk was V and feature was
         // enabled?
         private final boolean mWouldBlockActivityStartIgnoringFlag;
 
-        BlockActivityStart(boolean shouldBlockActivityStart,
+        private BlockActivityStart(boolean shouldBlockActivityStart,
                 boolean wouldBlockActivityStartIgnoringFlags) {
             this.mBlockActivityStartIfFlagEnabled = shouldBlockActivityStart;
             this.mWouldBlockActivityStartIgnoringFlag = wouldBlockActivityStartIgnoringFlags;
