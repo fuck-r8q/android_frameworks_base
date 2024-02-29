@@ -240,6 +240,7 @@ import com.android.server.policy.keyguard.KeyguardServiceDelegate.DrawnListener;
 import com.android.server.policy.keyguard.KeyguardStateMonitor.StateCallback;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.vibrator.HapticFeedbackVibrationProvider;
+import com.android.server.vibrator.VibratorFrameworkStatsLogger;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
@@ -6473,6 +6474,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         VibrationAttributes attrs =
                 mHapticFeedbackVibrationProvider.getVibrationAttributesForHapticFeedback(
                         effectId, /* bypassVibrationIntensitySetting= */ always);
+        VibratorFrameworkStatsLogger.logPerformHapticsFeedbackIfKeyboard(uid, effectId);
         mVibrator.vibrate(uid, packageName, effect, reason, attrs);
         return true;
     }
