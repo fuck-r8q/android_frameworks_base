@@ -365,8 +365,8 @@ class MobileIconInteractorImpl(
                 ddsIcon,
                 crossSimdisplaySingnalLevel,
                 connectionRepository.ciwlanAvailable,
-            ) { isDefaultDataSub, imsRegistrationTech, ddsIcon, ciwlanAvailable,
-                crossSimdisplaySingnalLevel ->
+            ) { isDefaultDataSub, imsRegistrationTech, ddsIcon, crossSimdisplaySingnalLevel,
+                ciwlanAvailable ->
                 if (!isDefaultDataSub
                     && crossSimdisplaySingnalLevel
                     && ciwlanAvailable
@@ -586,6 +586,18 @@ class MobileIconInteractorImpl(
             )
         }
 
+    private val customizedCellularIcon : Flow<SignalIconModel.Cellular> =
+        combine(
+            cellularIcon,
+            customizedIcon,
+        ) { cellularIcon, customizedIcon ->
+            if (customizedIcon != null && customizedIcon is SignalIconModel.Cellular) {
+                customizedIcon
+            } else {
+                cellularIcon
+            }
+        }
+
     override val signalLevelIcon: StateFlow<SignalIconModel> = run {
         val initial =
             SignalIconModel.Cellular(
@@ -599,7 +611,7 @@ class MobileIconInteractorImpl(
                 if (ntn) {
                     satelliteIcon
                 } else {
-                    cellularIcon
+                    customizedCellularIcon
                 }
             }
             .distinctUntilChanged()
