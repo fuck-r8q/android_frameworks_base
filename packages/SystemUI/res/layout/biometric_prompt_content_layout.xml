@@ -17,16 +17,11 @@
     android:id="@+id/customized_view"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center_vertical"
-    android:orientation="vertical"
     style="@style/AuthCredentialContentLayoutStyle">
 
     <TextView
-        android:id="@+id/customized_view_title"
-        style="@style/TextAppearance.AuthCredential.ContentViewTitle"
+        android:id="@+id/customized_view_description"
+        style="@style/TextAppearance.AuthCredential.ContentViewDescription"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="marquee"
-        android:marqueeRepeatLimit="1"
-        android:singleLine="true" />
+        android:layout_height="wrap_content" />
 </LinearLayout>
