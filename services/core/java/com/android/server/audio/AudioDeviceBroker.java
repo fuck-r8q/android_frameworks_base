@@ -2583,6 +2583,10 @@ public class AudioDeviceBroker {
                     Log.w(TAG, "onUpdateCommunicationRoute, set it to active BLE device");
                     defaultDevice =
                         mDeviceInventory.getDeviceOfType(AudioSystem.DEVICE_OUT_BLE_HEADSET);
+                } else if (defaultDevice != null && requestedDevice == null
+                           && defaultDevice.getType() == AudioDeviceInfo.TYPE_BLE_HEADSET) {
+                    Log.w(TAG, "onUpdateCommunicationRoute, clear default BLE device");
+                    defaultDevice = null;
                 }
             }
             if (defaultDevice != null) {
