@@ -523,7 +523,7 @@ class DeviceBasedSatelliteViewModelTest : SysuiTestCase() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun carrierText_connectionStateUnknown_null() =
+    fun carrierText_connectionStateUnknown_usesEmergencyOnlyText() =
         testScope.runTest {
             val latest by collectLastValue(underTest.carrierText)
 
@@ -539,12 +539,13 @@ class DeviceBasedSatelliteViewModelTest : SysuiTestCase() {
             // Wait for delay to be completed
             advanceTimeBy(10.seconds)
 
-            assertThat(latest).isNull()
+            assertThat(latest)
+                .isEqualTo(context.getString(R.string.satellite_emergency_only_carrier_text))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun carrierText_connectionStateOff_null() =
+    fun carrierText_connectionStateOff_usesEmergencyOnlyText() =
         testScope.runTest {
             val latest by collectLastValue(underTest.carrierText)
 
@@ -560,7 +561,8 @@ class DeviceBasedSatelliteViewModelTest : SysuiTestCase() {
             // Wait for delay to be completed
             advanceTimeBy(10.seconds)
 
-            assertThat(latest).isNull()
+            assertThat(latest)
+                .isEqualTo(context.getString(R.string.satellite_emergency_only_carrier_text))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
