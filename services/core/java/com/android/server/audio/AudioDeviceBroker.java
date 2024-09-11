@@ -1134,7 +1134,12 @@ public class AudioDeviceBroker {
                     AudioSystem.setParameters("A2dpSuspended=true");
                     mBluetoothA2dpSuspendedApplied = true;
                 }
-                if (!mBluetoothLeSuspendedApplied) {
+                boolean mVoipLeaWarEnabled =
+                        SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
+                boolean isLeVoIPOngoing = mVoipLeaWarEnabled && !mBtHelper.isAudioConnected();
+                if (isLeVoIPOngoing) {
+                    Log.v(TAG, "skip set LeAudioSuspended to true when LEA VoIP was ongoing");
+                } else if (!mBluetoothLeSuspendedApplied) {
                     AudioSystem.setParameters("LeAudioSuspended=true");
                     mBluetoothLeSuspendedApplied = true;
                 }
@@ -1144,7 +1149,9 @@ public class AudioDeviceBroker {
                 AudioSystem.setParameters("bt_headset_name=" + mBtHeadsetName
                         + ";bt_headset_nrec=" + (mHasNrecEnabled ? "on" : "off")
                         + ";bt_wbs=" + (mHasWbsEnabled ? "on" : "off"));
-                AudioSystem.setParameters("BT_SCO=on");
+                if (!isLeVoIPOngoing) {
+                    AudioSystem.setParameters("BT_SCO=on");
+                }
             } else {
                 AudioSystem.setParameters("BT_SCO=off");
             }
