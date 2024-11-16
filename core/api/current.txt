@@ -1074,6 +1074,7 @@ package android {
     field public static final int layout = 16842994; // 0x10100f2
     field public static final int layoutAnimation = 16842988; // 0x10100ec
     field public static final int layoutDirection = 16843698; // 0x10103b2
+    field @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") public static final int layoutLabel;
     field public static final int layoutMode = 16843738; // 0x10103da
     field public static final int layout_above = 16843140; // 0x1010184
     field public static final int layout_alignBaseline = 16843142; // 0x1010186
@@ -8023,6 +8024,7 @@ package android.app.admin {
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String CONTENT_PROTECTION_POLICY = "contentProtection";
     field public static final String KEYGUARD_DISABLED_FEATURES_POLICY = "keyguardDisabledFeatures";
     field public static final String LOCK_TASK_POLICY = "lockTask";
+    field @FlaggedApi("android.app.admin.flags.set_mte_policy_coexistence") public static final String MEMORY_TAGGING_POLICY = "memoryTagging";
     field public static final String PACKAGES_SUSPENDED_POLICY = "packagesSuspended";
     field public static final String PACKAGE_UNINSTALL_BLOCKED_POLICY = "packageUninstallBlocked";
     field public static final String PASSWORD_COMPLEXITY_POLICY = "passwordComplexity";
@@ -16418,6 +16420,7 @@ package android.graphics {
     field public static final int FLEX_RGBA_8888 = 42; // 0x2a
     field public static final int FLEX_RGB_888 = 41; // 0x29
     field public static final int HEIC = 1212500294; // 0x48454946
+    field @FlaggedApi("com.android.internal.camera.flags.camera_heif_gainmap") public static final int HEIC_ULTRAHDR = 4102; // 0x1006
     field public static final int JPEG = 256; // 0x100
     field public static final int JPEG_R = 4101; // 0x1005
     field public static final int NV16 = 16; // 0x10
@@ -18708,6 +18711,7 @@ package android.hardware {
     field public static final int DATASPACE_DISPLAY_P3 = 143261696; // 0x88a0000
     field public static final int DATASPACE_DYNAMIC_DEPTH = 4098; // 0x1002
     field public static final int DATASPACE_HEIF = 4100; // 0x1004
+    field @FlaggedApi("com.android.internal.camera.flags.camera_heif_gainmap") public static final int DATASPACE_HEIF_ULTRAHDR = 4102; // 0x1006
     field public static final int DATASPACE_JFIF = 146931712; // 0x8c20000
     field public static final int DATASPACE_JPEG_R = 4101; // 0x1005
     field public static final int DATASPACE_SCRGB = 411107328; // 0x18810000
@@ -20986,6 +20990,7 @@ package android.inputmethodservice {
     method @Deprecated public android.inputmethodservice.AbstractInputMethodService.AbstractInputMethodSessionImpl onCreateInputMethodSessionInterface();
     method public android.view.View onCreateInputView();
     method protected void onCurrentInputMethodSubtypeChanged(android.view.inputmethod.InputMethodSubtype);
+    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") public void onCustomImeSwitcherButtonRequestedVisible(boolean);
     method public void onDisplayCompletions(android.view.inputmethod.CompletionInfo[]);
     method public boolean onEvaluateFullscreenMode();
     method @CallSuper public boolean onEvaluateInputViewShown();
@@ -52999,7 +53004,7 @@ package android.view {
     method public void addOnUnhandledKeyEventListener(android.view.View.OnUnhandledKeyEventListener);
     method public void addTouchables(java.util.ArrayList<android.view.View>);
     method public android.view.ViewPropertyAnimator animate();
-    method public void announceForAccessibility(CharSequence);
+    method @Deprecated @FlaggedApi("android.view.accessibility.deprecate_accessibility_announcement_apis") public void announceForAccessibility(CharSequence);
     method public void autofill(android.view.autofill.AutofillValue);
     method public void autofill(@NonNull android.util.SparseArray<android.view.autofill.AutofillValue>);
     method protected boolean awakenScrollBars();
@@ -55249,7 +55254,7 @@ package android.view.accessibility {
     field public static final int SPEECH_STATE_SPEAKING_END = 2; // 0x2
     field public static final int SPEECH_STATE_SPEAKING_START = 1; // 0x1
     field public static final int TYPES_ALL_MASK = -1; // 0xffffffff
-    field public static final int TYPE_ANNOUNCEMENT = 16384; // 0x4000
+    field @Deprecated @FlaggedApi("android.view.accessibility.deprecate_accessibility_announcement_apis") public static final int TYPE_ANNOUNCEMENT = 16384; // 0x4000
     field public static final int TYPE_ASSIST_READING_CONTEXT = 16777216; // 0x1000000
     field public static final int TYPE_GESTURE_DETECTION_END = 524288; // 0x80000
     field public static final int TYPE_GESTURE_DETECTION_START = 262144; // 0x40000
@@ -56977,6 +56982,9 @@ package android.view.inputmethod {
     method public String getExtraValueOf(String);
     method public int getIconResId();
     method @NonNull public String getLanguageTag();
+    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") @NonNull public CharSequence getLayoutDisplayName(@NonNull android.content.Context, @NonNull android.content.pm.ApplicationInfo);
+    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") @NonNull public CharSequence getLayoutLabelNonLocalized();
+    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") @StringRes public int getLayoutLabelResource();
     method @Deprecated @NonNull public String getLocale();
     method public String getMode();
     method @NonNull public CharSequence getNameOverride();
@@ -56996,6 +57004,8 @@ package android.view.inputmethod {
     method public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setIsAsciiCapable(boolean);
     method public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setIsAuxiliary(boolean);
     method public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setLanguageTag(String);
+    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") @NonNull public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setLayoutLabelNonLocalized(@NonNull CharSequence);
+    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") @NonNull public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setLayoutLabelResource(@StringRes int);
     method public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setOverridesImplicitlyEnabledSubtype(boolean);
     method @NonNull public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setPhysicalKeyboardHint(@Nullable android.icu.util.ULocale, @NonNull String);
     method public android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder setSubtypeExtraValue(String);
@@ -62048,6 +62058,11 @@ package android.window {
     method public boolean add(@NonNull android.view.SurfaceControlViewHost.SurfacePackage, @Nullable Runnable);
     method public void addTransaction(@NonNull android.view.SurfaceControl.Transaction);
     method public void markSyncReady();
+  }
+
+  @FlaggedApi("com.android.window.flags.predictive_back_system_override_callback") public final class SystemOnBackInvokedCallbacks {
+    method @FlaggedApi("com.android.window.flags.predictive_back_system_override_callback") @NonNull public static android.window.OnBackInvokedCallback finishAndRemoveTaskCallback(@NonNull android.app.Activity);
+    method @FlaggedApi("com.android.window.flags.predictive_back_system_override_callback") @NonNull public static android.window.OnBackInvokedCallback moveTaskToBackCallback(@NonNull android.app.Activity);
   }
 
   @FlaggedApi("com.android.window.flags.trusted_presentation_listener_for_window") public final class TrustedPresentationThresholds implements android.os.Parcelable {
