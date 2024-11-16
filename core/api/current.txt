@@ -241,6 +241,7 @@ package android {
     field public static final String PROVIDE_REMOTE_CREDENTIALS = "android.permission.PROVIDE_REMOTE_CREDENTIALS";
     field @FlaggedApi("android.security.aapm_api") public static final String QUERY_ADVANCED_PROTECTION_MODE = "android.permission.QUERY_ADVANCED_PROTECTION_MODE";
     field public static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
+    field @FlaggedApi("android.permission.flags.ranging_permission_enabled") public static final String RANGING = "android.permission.RANGING";
     field public static final String READ_ASSISTANT_APP_SEARCH_DATA = "android.permission.READ_ASSISTANT_APP_SEARCH_DATA";
     field public static final String READ_BASIC_PHONE_STATE = "android.permission.READ_BASIC_PHONE_STATE";
     field public static final String READ_CALENDAR = "android.permission.READ_CALENDAR";
@@ -9247,6 +9248,7 @@ package android.app.job {
     method @Nullable public String getNamespace();
     method @Nullable public abstract android.app.job.JobInfo getPendingJob(int);
     method public int getPendingJobReason(int);
+    method @FlaggedApi("android.app.job.get_pending_job_reasons_api") @NonNull public int[] getPendingJobReasons(int);
     method @NonNull public java.util.Map<java.lang.String,java.util.List<android.app.job.JobInfo>> getPendingJobsInAllNamespaces();
     method public abstract int schedule(@NonNull android.app.job.JobInfo);
     field public static final int PENDING_JOB_REASON_APP = 1; // 0x1
@@ -9256,6 +9258,7 @@ package android.app.job {
     field public static final int PENDING_JOB_REASON_CONSTRAINT_CHARGING = 5; // 0x5
     field public static final int PENDING_JOB_REASON_CONSTRAINT_CONNECTIVITY = 6; // 0x6
     field public static final int PENDING_JOB_REASON_CONSTRAINT_CONTENT_TRIGGER = 7; // 0x7
+    field @FlaggedApi("android.app.job.get_pending_job_reasons_api") public static final int PENDING_JOB_REASON_CONSTRAINT_DEADLINE = 16; // 0x10
     field public static final int PENDING_JOB_REASON_CONSTRAINT_DEVICE_IDLE = 8; // 0x8
     field public static final int PENDING_JOB_REASON_CONSTRAINT_MINIMUM_LATENCY = 9; // 0x9
     field public static final int PENDING_JOB_REASON_CONSTRAINT_PREFETCH = 10; // 0xa
@@ -9689,10 +9692,8 @@ package android.app.wallpaper {
     method @Nullable public String getId();
     method @Nullable public android.net.Uri getThumbnail();
     method @Nullable public CharSequence getTitle();
-    method @NonNull public static android.app.wallpaper.WallpaperDescription readFromStream(@NonNull java.io.InputStream) throws java.io.IOException;
     method @NonNull public android.app.wallpaper.WallpaperDescription.Builder toBuilder();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
-    method public void writeToStream(@NonNull java.io.OutputStream) throws java.io.IOException;
     field @NonNull public static final android.os.Parcelable.Creator<android.app.wallpaper.WallpaperDescription> CREATOR;
   }
 
@@ -12734,6 +12735,7 @@ package android.content.pm {
     method public abstract void onPackagesUnavailable(String[], android.os.UserHandle, boolean);
     method public void onPackagesUnsuspended(String[], android.os.UserHandle);
     method public void onShortcutsChanged(@NonNull String, @NonNull java.util.List<android.content.pm.ShortcutInfo>, @NonNull android.os.UserHandle);
+    method @FlaggedApi("android.multiuser.add_launcher_user_config") public void onUserConfigChanged(@NonNull android.content.pm.LauncherUserInfo);
   }
 
   public static final class LauncherApps.PinItemRequest implements android.os.Parcelable {
@@ -12769,10 +12771,12 @@ package android.content.pm {
 
   @FlaggedApi("android.os.allow_private_profile") public final class LauncherUserInfo implements android.os.Parcelable {
     method @FlaggedApi("android.os.allow_private_profile") public int describeContents();
+    method @FlaggedApi("android.multiuser.add_launcher_user_config") @NonNull public android.os.Bundle getUserConfig();
     method @FlaggedApi("android.os.allow_private_profile") public int getUserSerialNumber();
     method @FlaggedApi("android.os.allow_private_profile") @NonNull public String getUserType();
     method @FlaggedApi("android.os.allow_private_profile") public void writeToParcel(@NonNull android.os.Parcel, int);
     field @FlaggedApi("android.os.allow_private_profile") @NonNull public static final android.os.Parcelable.Creator<android.content.pm.LauncherUserInfo> CREATOR;
+    field @FlaggedApi("android.multiuser.add_launcher_user_config") public static final String PRIVATE_SPACE_ENTRYPOINT_HIDDEN = "private_space_entrypoint_hidden";
   }
 
   public final class ModuleInfo implements android.os.Parcelable {
@@ -13703,7 +13707,7 @@ package android.content.pm {
     field public static final int FLAG_STOP_WITH_TASK = 1; // 0x1
     field public static final int FLAG_USE_APP_ZYGOTE = 8; // 0x8
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CAMERA}, anyOf={android.Manifest.permission.CAMERA}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CAMERA = 64; // 0x40
-    field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE}, anyOf={android.Manifest.permission.BLUETOOTH_ADVERTISE, android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.CHANGE_NETWORK_STATE, android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.CHANGE_WIFI_MULTICAST_STATE, android.Manifest.permission.NFC, android.Manifest.permission.TRANSMIT_IR, android.Manifest.permission.UWB_RANGING}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE = 16; // 0x10
+    field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE}, anyOf={android.Manifest.permission.BLUETOOTH_ADVERTISE, android.Manifest.permission.BLUETOOTH_CONNECT, android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.CHANGE_NETWORK_STATE, android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.CHANGE_WIFI_MULTICAST_STATE, android.Manifest.permission.NFC, android.Manifest.permission.TRANSMIT_IR, android.Manifest.permission.UWB_RANGING, android.Manifest.permission.RANGING}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE = 16; // 0x10
     field @RequiresPermission(value=android.Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_DATA_SYNC = 1; // 0x1
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_HEALTH}, anyOf={android.Manifest.permission.ACTIVITY_RECOGNITION, android.Manifest.permission.BODY_SENSORS, android.Manifest.permission.HIGH_SAMPLING_RATE_SENSORS}) public static final int FOREGROUND_SERVICE_TYPE_HEALTH = 256; // 0x100
     field @RequiresPermission(allOf={android.Manifest.permission.FOREGROUND_SERVICE_LOCATION}, anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}, conditional=true) public static final int FOREGROUND_SERVICE_TYPE_LOCATION = 8; // 0x8
@@ -16847,6 +16851,7 @@ package android.graphics {
     field @FlaggedApi("com.android.text.flags.letter_spacing_justification") public static final int TEXT_RUN_FLAG_LEFT_EDGE = 8192; // 0x2000
     field @FlaggedApi("com.android.text.flags.letter_spacing_justification") public static final int TEXT_RUN_FLAG_RIGHT_EDGE = 16384; // 0x4000
     field public static final int UNDERLINE_TEXT_FLAG = 8; // 0x8
+    field @FlaggedApi("com.android.text.flags.vertical_text_layout") public static final int VERTICAL_TEXT_FLAG = 4096; // 0x1000
   }
 
   public enum Paint.Align {
@@ -20990,7 +20995,6 @@ package android.inputmethodservice {
     method @Deprecated public android.inputmethodservice.AbstractInputMethodService.AbstractInputMethodSessionImpl onCreateInputMethodSessionInterface();
     method public android.view.View onCreateInputView();
     method protected void onCurrentInputMethodSubtypeChanged(android.view.inputmethod.InputMethodSubtype);
-    method @FlaggedApi("android.view.inputmethod.ime_switcher_revamp_api") public void onCustomImeSwitcherButtonRequestedVisible(boolean);
     method public void onDisplayCompletions(android.view.inputmethod.CompletionInfo[]);
     method public boolean onEvaluateFullscreenMode();
     method @CallSuper public boolean onEvaluateInputViewShown();
@@ -55580,6 +55584,7 @@ package android.view.accessibility {
     field public static final String EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH = "android.view.accessibility.extra.DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH";
     field public static final int EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_MAX_LENGTH = 20000; // 0x4e20
     field public static final String EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX = "android.view.accessibility.extra.DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX";
+    field @FlaggedApi("android.view.accessibility.a11y_character_in_window_api") public static final String EXTRA_DATA_TEXT_CHARACTER_LOCATION_IN_WINDOW_KEY = "android.view.accessibility.extra.DATA_TEXT_CHARACTER_LOCATION_IN_WINDOW_KEY";
     field public static final String EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY = "android.view.accessibility.extra.DATA_TEXT_CHARACTER_LOCATION_KEY";
     field public static final int FLAG_PREFETCH_ANCESTORS = 1; // 0x1
     field public static final int FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST = 16; // 0x10
