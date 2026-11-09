@@ -1084,12 +1084,17 @@ public class AuthService extends SystemService {
             return;
         }
 
+        final boolean hasPhysicalAidlSensor = fingerprintAidlInstances != null
+                && Arrays.stream(fingerprintAidlInstances)
+                        .anyMatch(instance -> !"virtual".equals(instance));
+        final boolean useHidlSensors = !hasPhysicalAidlSensor
+                && hidlConfigStrings != null && hidlConfigStrings.length > 0;
+
         handlerProvider.getFingerprintHandler().post(() -> {
             final FingerprintSensorConfigurations mFingerprintSensorConfigurations =
-                    new FingerprintSensorConfigurations(!(hidlConfigStrings != null
-                            && hidlConfigStrings.length > 0));
+                    new FingerprintSensorConfigurations(!useHidlSensors);
 
-            if (hidlConfigStrings != null && hidlConfigStrings.length > 0) {
+            if (useHidlSensors) {
                 mFingerprintSensorConfigurations.addHidlSensors(hidlConfigStrings, context);
             }
 

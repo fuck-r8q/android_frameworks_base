@@ -205,6 +205,42 @@ public class AuthServiceTest {
     }
 
     @Test
+    public void testRegisterFingerprint_prefersPhysicalAidlOverHidl() throws RemoteException {
+        when(mInjector.getFingerprintAidlInstances())
+                .thenReturn(new String[]{"default", "virtual"});
+
+        mAuthService = new AuthService(mContext, mInjector);
+        mAuthService.onStart();
+        mFingerprintLooper.dispatchAll();
+
+        verify(mFingerprintService).registerAuthenticators(
+                mFingerprintSensorConfigurationsCaptor.capture());
+        final FingerprintSensorConfigurations config =
+                mFingerprintSensorConfigurationsCaptor.getValue();
+        assertEquals(true, config.doesInstanceExist("default"));
+        assertEquals(true, config.doesInstanceExist("virtual"));
+        assertEquals(false, config.doesInstanceExist("defaultHIDL"));
+        assertEquals(true, config.getResetLockoutRequiresHardwareAuthToken());
+    }
+
+    @Test
+    public void testRegisterFingerprint_virtualAidlPreservesHidl() throws RemoteException {
+        when(mInjector.getFingerprintAidlInstances()).thenReturn(new String[]{"virtual"});
+
+        mAuthService = new AuthService(mContext, mInjector);
+        mAuthService.onStart();
+        mFingerprintLooper.dispatchAll();
+
+        verify(mFingerprintService).registerAuthenticators(
+                mFingerprintSensorConfigurationsCaptor.capture());
+        final FingerprintSensorConfigurations config =
+                mFingerprintSensorConfigurationsCaptor.getValue();
+        assertEquals(true, config.doesInstanceExist("defaultHIDL"));
+        assertEquals(true, config.doesInstanceExist("virtual"));
+        assertEquals(false, config.getResetLockoutRequiresHardwareAuthToken());
+    }
+
+    @Test
     public void testRegisterNullService_doesNotRegister() throws Exception {
         setInternalAndTestBiometricPermissions(mContext, true /* hasPermission */);
 
