@@ -1337,6 +1337,10 @@ public class Watchdog implements Dumpable {
             } catch(IOException e) {
                 Slog.i(TAG, "Debugfs node not found", e);
             }
+            if (in == null) {
+                Slog.i(TAG, "Binder state unavailable");
+                return;
+            }
             FileWriter out = new FileWriter("/data/anr/BinderTraces_pid" +
                     String.valueOf(Process.myPid()) + ".txt");
             String line = null;
